@@ -21,24 +21,50 @@ BrewLog is a private tool for a small group of specialty coffee enthusiasts. It 
 
 ### Prerequisites
 
-- Node.js 18+
-- npm
+Install Node.js (v18 or above) from **https://nodejs.org** — click the green **"LTS"** button and run the installer.
 
-### Setup
+> **How to open a terminal:**
+> - **Mac:** Press `Cmd + Space`, type "Terminal", and press Enter
+> - **Windows:** Press `Win + R`, type `cmd`, and press Enter
+
+### First-time setup
+
+Open a terminal and run these commands one at a time:
 
 ```bash
-# Install dependencies
+# Download the project
+git clone https://github.com/vito-zbw/brewlog.git
+cd brewlog
+
+# Install dependencies (takes a minute or two)
 npm install
 
-# The database auto-initializes on first run.
-# To seed it with mock data, run:
-npm run seed
-
-# Start the dev server
+# Start the app
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to see the app.
+> If you don't have `git`, click the green **"Code"** button on the GitHub page, choose **"Download ZIP"**, unzip it, then open a terminal inside that folder.
+
+The database auto-initializes with sample data on first run.
+
+### Open the app
+
+Once `npm run dev` is running, open your browser and go to:
+
+**http://localhost:3000**
+
+Leave the terminal open — closing it stops the app. To stop it manually, press `Ctrl + C`.
+
+### Next time you want to open the app
+
+You don't need to install anything again. Just open a terminal and run:
+
+```bash
+cd brewlog
+npm run dev
+```
+
+Then open **http://localhost:3000** in your browser.
 
 ## Project Structure
 
