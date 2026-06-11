@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Bean, Cafe } from "@/types";
-import { BREW_METHODS, TEAM_MEMBERS } from "@/lib/terms";
+import { BREW_METHODS, TEAM_MEMBERS, type TeamMember } from "@/lib/terms";
+import { useCurrentUser } from "@/lib/useCurrentUser";
 import { RatingInput } from "@/components/RatingInput";
 import { NewBeanForm } from "@/components/NewBeanForm";
 
@@ -40,7 +41,7 @@ export default function NewVisitPage() {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
 
-  const [visitedBy, setVisitedBy] = useState<string>(TEAM_MEMBERS[0]);
+  const [visitedBy, setVisitedBy] = useCurrentUser();
   const [cafeId, setCafeId] = useState("");
   const [isNewCafe, setIsNewCafe] = useState(false);
   const [newCafe, setNewCafe] = useState({ name: "", city: "", country: "", lat: "", lng: "" });
@@ -156,7 +157,7 @@ export default function NewVisitPage() {
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className={cardClass}>
           <label className="block text-sm font-medium text-espresso mb-2">你的名字</label>
-          <select data-testid="log-user-select" value={visitedBy} onChange={(e) => setVisitedBy(e.target.value)} className={inputClass}>
+          <select data-testid="log-user-select" value={visitedBy} onChange={(e) => setVisitedBy(e.target.value as TeamMember)} className={inputClass}>
             {TEAM_MEMBERS.map((m) => (
               <option key={m} value={m}>{m}</option>
             ))}

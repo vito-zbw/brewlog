@@ -14,7 +14,7 @@ These docs cover the **interactive browser/account setups that cannot be automat
 | --- | --- | --- | --- |
 | [`turso-setup.md`](./turso-setup.md) | Turso cloud database (production SQLite) | Before your first Vercel deploy | No |
 | [`vercel-deploy.md`](./vercel-deploy.md) | Vercel hosting + env vars | End of Phase 1; redeploy at the end of each phase | No |
-| `r2-setup.md` — **not written yet, available in Phase 2** | Cloudflare R2 photo storage | Phase 2 deploy | No |
+| [`r2-setup.md`](./r2-setup.md) | Cloudflare R2 photo storage | Phase 2 deploy | No |
 | `oauth-setup.md` — **not written yet, available in Phase 3** | Google + GitHub login (Auth.js) | Phase 3 | No |
 | `custom-domain.md` — **not written yet, available in Phase 3** | Custom domain + HTTPS on Vercel | Phase 3, optional | No |
 

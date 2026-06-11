@@ -1,14 +1,10 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { getBeanWithVisits } from "@/lib/queries";
-import {
-  BREW_METHODS,
-  PROCESSING_METHODS,
-  ROAST_LEVELS,
-  formatVisitDate,
-  optionLabel,
-} from "@/lib/terms";
-import { RatingBeans } from "@/components/RatingBeans";
+import { getBeanWithVisits, listPhotos } from "@/lib/queries";
+import { PROCESSING_METHODS, ROAST_LEVELS, optionLabel } from "@/lib/terms";
+import { PhotoGallery } from "@/components/PhotoGallery";
+import { PhotoUpload } from "@/components/PhotoUpload";
+import { VisitCard } from "@/components/VisitCard";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +23,8 @@ export default async function BeanDetailPage({
   if (!bean) {
     notFound();
   }
+
+  const photos = await listPhotos("bean", bean.id);
 
   const tags =
     bean.tasting_notes_tags
@@ -116,6 +114,14 @@ export default async function BeanDetailPage({
             </p>
           </div>
         )}
+
+        <div className="mt-6">
+          <h2 className="text-xs text-warm-gray/70 uppercase tracking-wider mb-2">
+            照片
+          </h2>
+          <PhotoUpload entityType="bean" entityId={bean.id} />
+          <PhotoGallery photos={photos} />
+        </div>
       </div>
 
       <h2 className="text-2xl font-bold font-[Playfair_Display] text-espresso mb-4">
@@ -129,33 +135,7 @@ export default async function BeanDetailPage({
       ) : (
         <div className="space-y-4">
           {visits.map((visit) => (
-            <div
-              key={visit.id}
-              className="bg-white rounded-xl shadow-sm border border-cream-dark/50 p-5"
-            >
-              <div className="flex items-start justify-between mb-2">
-                <div>
-                  <h3 className="font-[Playfair_Display] font-semibold text-espresso">
-                    {visit.cafe_name}
-                  </h3>
-                  <p className="text-warm-gray text-sm">
-                    {visit.cafe_city} &middot; {formatVisitDate(visit.visit_date)}{" "}
-                    &middot; {optionLabel(BREW_METHODS, visit.brew_method)}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <RatingBeans rating={visit.rating_overall} />
-                  <p className="text-xs text-warm-gray mt-1">
-                    {visit.visited_by} 记录
-                  </p>
-                </div>
-              </div>
-              {visit.notes && (
-                <p className="text-sm text-warm-gray leading-relaxed">
-                  {visit.notes}
-                </p>
-              )}
-            </div>
+            <VisitCard key={visit.id} visit={visit} />
           ))}
         </div>
       )}

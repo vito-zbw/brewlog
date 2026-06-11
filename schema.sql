@@ -53,6 +53,17 @@ CREATE TABLE IF NOT EXISTS visit_beans (
     PRIMARY KEY (visit_id, bean_id)
 );
 
+CREATE TABLE IF NOT EXISTS photos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    entity_type TEXT NOT NULL CHECK(entity_type IN ('bean','cafe','visit')),
+    entity_id INTEGER NOT NULL,                  -- id within the entity_type table (no FK across three tables)
+    storage_key TEXT NOT NULL,                   -- key in R2 / data/uploads; public URL computed at read time
+    content_type TEXT NOT NULL,                  -- e.g. image/jpeg
+    caption TEXT,
+    created_by TEXT NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Indexes for common query patterns
 CREATE INDEX IF NOT EXISTS idx_beans_origin ON beans(origin_country);
 CREATE INDEX IF NOT EXISTS idx_beans_roaster ON beans(roaster);
@@ -60,3 +71,4 @@ CREATE INDEX IF NOT EXISTS idx_cafes_city ON cafes(city);
 CREATE INDEX IF NOT EXISTS idx_visits_cafe ON visits(cafe_id);
 CREATE INDEX IF NOT EXISTS idx_visits_date ON visits(visit_date DESC);
 CREATE INDEX IF NOT EXISTS idx_visits_visitor ON visits(visited_by);
+CREATE INDEX IF NOT EXISTS idx_photos_entity ON photos(entity_type, entity_id);

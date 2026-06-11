@@ -69,10 +69,10 @@ export function CafeMapInner({ cafes }: CafeMapInnerProps) {
                   <p className="mb-2">还没有探店记录</p>
                 )}
                 <Link
-                  href={`/visits?cafe_id=${cafe.id}`}
+                  href={`/cafes/${cafe.id}`}
                   className="text-terracotta hover:underline font-medium"
                 >
-                  查看探店记录 &rarr;
+                  查看咖啡馆详情 &rarr;
                 </Link>
               </div>
             </Popup>

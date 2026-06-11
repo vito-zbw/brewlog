@@ -55,6 +55,7 @@ Claude Code session and say "help me complete this process".
 
 1. [`docs/setup/turso-setup.md`](docs/setup/turso-setup.md) — create the cloud database
 2. [`docs/setup/vercel-deploy.md`](docs/setup/vercel-deploy.md) — deploy to Vercel
+3. [`docs/setup/r2-setup.md`](docs/setup/r2-setup.md) — photo storage (required before uploading photos on the deployed site)
 
 All env vars are documented in `.env.example`.
 
@@ -87,10 +88,10 @@ original language. The database stores canonical English values for closed lists
 ## Roadmap
 
 - **Phase 1** ✅ — Private coffee journal (MVP): bean library, café map, visit logging, visit history
-- **Phase 2** — Photos and polish: image uploads (Cloudflare R2), dashboard with stats, improved filters
+- **Phase 2** ✅ — Photos and polish: image uploads (Cloudflare R2 with local-disk dev fallback), dashboard with personal stats, map filters (city / rating / brew method), café + visit detail pages
 - **Phase 3** — Multi-user: authentication (Auth.js), user profiles, custom domain
 - **Phase 4** — Social and discovery: follow system, activity feed, public pages, shareable links
 
 ## Current Status
 
-**Phase 1 (MVP) complete** — private use for 3 users (name dropdown, no authentication, no public access).
+**Phase 2 complete** — private use for 3 users (name dropdown, no authentication, no public access). Photos upload to Cloudflare R2 in production ([`docs/setup/r2-setup.md`](docs/setup/r2-setup.md)) or local disk in development.

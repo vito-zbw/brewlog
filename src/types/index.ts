@@ -61,6 +61,40 @@ export interface BeanWithVisits extends Bean {
   visits: VisitWithDetails[];
 }
 
+export type PhotoEntityType = "bean" | "cafe" | "visit";
+
+export interface Photo {
+  id: number;
+  entity_type: PhotoEntityType;
+  entity_id: number;
+  storage_key: string;
+  content_type: string;
+  caption: string | null;
+  created_by: string;
+  created_at: string;
+  /** Public URL computed from storage_key by the query layer. */
+  url: string;
+}
+
+export interface OriginStat {
+  origin_country: string;
+  avg_rating: number;
+  visit_count: number;
+}
+
+export interface BrewStat {
+  brew_method: string;
+  count: number;
+}
+
+export interface UserStats {
+  total_beans_tried: number;
+  total_cafes_visited: number;
+  total_visits: number;
+  top_origins: OriginStat[];
+  brew_breakdown: BrewStat[];
+}
+
 export interface NewBeanInput {
   name: string;
   origin_country: string;

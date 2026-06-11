@@ -53,19 +53,17 @@ test.describe("café map (/cafes)", () => {
     const popup = await openFirstMarkerPopup(page);
     // Visited cafés show "最高评分 N/5"; unvisited ones show "还没有探店记录".
     await expect(popup).toContainText(/最高评分|还没有探店记录/);
-    const visitsLink = popup.getByRole("link", { name: /查看探店记录/ });
+    const visitsLink = popup.getByRole("link", { name: /查看咖啡馆详情/ });
     await expect(visitsLink).toBeVisible();
-    await expect(visitsLink).toHaveAttribute("href", /^\/visits\?cafe_id=\d+/);
+    await expect(visitsLink).toHaveAttribute("href", /^\/cafes\/\d+/);
   });
 
   test("popup link navigates to that café's visit history", async ({
     page,
   }) => {
     const popup = await openFirstMarkerPopup(page);
-    await popup.getByRole("link", { name: /查看探店记录/ }).click();
-    await expect(page).toHaveURL(/\/visits\?cafe_id=\d+/);
-    await expect(
-      page.getByRole("heading", { name: "探店记录", exact: true })
-    ).toBeVisible();
+    await popup.getByRole("link", { name: /查看咖啡馆详情/ }).click();
+    await expect(page).toHaveURL(/\/cafes\/\d+/);
+    await expect(page.getByTestId("cafe-detail")).toBeVisible();
   });
 });

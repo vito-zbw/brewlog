@@ -18,7 +18,9 @@ export function VisitCard({ visit }: VisitCardProps) {
       <div className="flex items-start justify-between mb-2">
         <div>
           <h3 className="font-[Playfair_Display] font-semibold text-espresso text-lg">
-            {visit.cafe_name}
+            <Link href={`/visits/${visit.id}`} className="hover:underline">
+              {visit.cafe_name}
+            </Link>
           </h3>
           <p className="text-warm-gray text-sm">
             {visit.cafe_city} &middot; {formattedDate}
@@ -32,7 +34,7 @@ export function VisitCard({ visit }: VisitCardProps) {
         </div>
       </div>
 
-      <div className="flex items-center gap-2 mb-3">
+      <div className="flex flex-wrap items-center gap-2 mb-3">
         <span className="text-xs px-2 py-0.5 rounded-full bg-espresso/10 text-espresso font-medium">
           {optionLabel(BREW_METHODS, visit.brew_method)}
         </span>

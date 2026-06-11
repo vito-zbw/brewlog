@@ -3,3 +3,5 @@
 export * from "./beans";
 export * from "./cafes";
 export * from "./visits";
+export * from "./photos";
+export * from "./stats";
