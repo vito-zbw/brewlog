@@ -1,6 +1,10 @@
 -- BrewLog Database Schema
--- This is the single source of truth for the data model.
--- Run this file to initialize a fresh database.
+-- Single source of truth for the data model.
+-- Apply with `npm run db:init` (local) or `turso db shell brewlog < schema.sql` (cloud).
+--
+-- Enum-like columns (processing_method, roast_level, brew_method) store canonical
+-- English values; the bilingual "中文 English" display labels live in src/lib/terms.ts.
+-- tasting_notes_tags stores the full bilingual display strings, comma-separated.
 
 CREATE TABLE IF NOT EXISTS beans (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -8,20 +12,20 @@ CREATE TABLE IF NOT EXISTS beans (
     origin_country TEXT NOT NULL,                -- e.g. "Ethiopia"
     origin_region TEXT,                          -- e.g. "Yirgacheffe"
     farm TEXT,                                   -- e.g. "Kochere washing station"
-    roaster TEXT,                                -- e.g. "Nylon Coffee Roasters"
-    processing_method TEXT NOT NULL DEFAULT 'unknown',  -- washed | natural | honey | anaerobic | unknown
-    roast_level TEXT NOT NULL DEFAULT 'medium',         -- light | medium-light | medium | medium-dark | dark
-    tasting_notes_tags TEXT,                     -- comma-separated tags, e.g. "blueberry,dark chocolate,citrus"
+    roaster TEXT,                                -- e.g. "Torch Coffee Lab"
+    processing_method TEXT NOT NULL DEFAULT 'Other',  -- Washed | Natural | Honey | Anaerobic | Wet-hulled | Other
+    roast_level TEXT NOT NULL DEFAULT 'Medium',       -- Light | Medium-Light | Medium | Medium-Dark | Dark
+    tasting_notes_tags TEXT,                     -- comma-separated bilingual tags, e.g. "果香 Fruity,花香 Floral"
     tasting_notes_freetext TEXT,                 -- free-form description
-    created_by TEXT NOT NULL,                    -- username string
+    created_by TEXT NOT NULL,                    -- username string (Phase 1-2; becomes user_id in Phase 3)
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS cafes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,                          -- e.g. "Nylon Coffee Roasters"
-    city TEXT NOT NULL,                          -- e.g. "Singapore"
-    country TEXT NOT NULL,                       -- e.g. "Singapore"
+    name TEXT NOT NULL,                          -- e.g. ".jpg coffee"
+    city TEXT NOT NULL,                          -- e.g. "广州"
+    country TEXT NOT NULL,                       -- e.g. "中国"
     latitude REAL NOT NULL,                      -- for map pin placement
     longitude REAL NOT NULL,
     website TEXT,                                -- optional URL
@@ -32,9 +36,9 @@ CREATE TABLE IF NOT EXISTS cafes (
 CREATE TABLE IF NOT EXISTS visits (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     cafe_id INTEGER NOT NULL REFERENCES cafes(id),
-    visited_by TEXT NOT NULL,                    -- username string
-    visit_date DATE NOT NULL,                    -- e.g. "2025-04-01"
-    brew_method TEXT NOT NULL,                   -- Espresso | V60 | Chemex | Aeropress | Siphon | French Press | Cold Brew | Other
+    visited_by TEXT NOT NULL,                    -- username string (Phase 1-2; becomes user_id in Phase 3)
+    visit_date DATE NOT NULL,                    -- e.g. "2026-04-01"
+    brew_method TEXT NOT NULL,                   -- Espresso | V60 | Chemex | Aeropress | French Press | Siphon | Cold Brew | Moka Pot | Auto Drip | Other
     rating_overall INTEGER NOT NULL CHECK(rating_overall BETWEEN 1 AND 5),
     rating_bean_quality INTEGER NOT NULL CHECK(rating_bean_quality BETWEEN 1 AND 5),
     rating_barista_skill INTEGER NOT NULL CHECK(rating_barista_skill BETWEEN 1 AND 5),

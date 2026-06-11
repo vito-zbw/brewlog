@@ -1,87 +1,96 @@
-# BrewLog
+# BrewLog ☕
 
-A specialty coffee discovery and review platform for documenting beans, logging café visits, and mapping your coffee adventures.
+精品咖啡探索与记录平台 — A specialty coffee discovery and review platform.
 
-## What is this?
+Document niche coffee beans, log café visits, and track tasting experiences.
 
-BrewLog is a private tool for a small group of specialty coffee enthusiasts. It lets you:
+## What It Does
 
-- **Catalog beans** — track origin, processing method, roaster, and tasting notes for every specialty coffee bean you try
-- **Log café visits** — rate your experience across bean quality, barista skill, and ambiance
-- **Map your discoveries** — see every café you've visited on an interactive map, color-coded by rating
+- **咖啡豆库 Bean Library** — searchable catalog of specialty coffee beans with origin, processing method, roaster, and tasting notes
+- **咖啡馆地图 Café Map** — interactive map of visited cafés, color-coded by rating (default view: Guangzhou)
+- **记录探店 Log a Visit** — structured form to rate café experiences across overall, bean quality, barista skill, and ambiance
+- **探店记录 Visit History** — timeline feed of all visits
 
 ## Tech Stack
 
-- **Next.js 14+** (App Router) with TypeScript
-- **SQLite** via better-sqlite3 (no external database needed)
-- **Leaflet** with OpenStreetMap for the café map
-- **Tailwind CSS** for styling
+| Layer       | Technology              | Notes                          |
+| ----------- | ----------------------- | ------------------------------ |
+| Framework   | Next.js (App Router)    | TypeScript                     |
+| Database    | Turso (via @libsql/client) | Cloud SQLite; local dev uses a file database — no account needed |
+| Map         | Leaflet + OpenStreetMap | No API key needed              |
+| Styling     | Tailwind CSS            |                                |
+| Testing     | Playwright              | e2e suite against a prod build |
+| Hosting     | Vercel                  | Free tier                      |
 
-## Getting Started
-
-### Prerequisites
-
-Install Node.js (v18 or above) from **https://nodejs.org** — click the green **"LTS"** button and run the installer.
-
-> **How to open a terminal:**
-> - **Mac:** Press `Cmd + Space`, type "Terminal", and press Enter
-> - **Windows:** Press `Win + R`, type `cmd`, and press Enter
-
-### First-time setup
-
-Open a terminal and run these commands one at a time:
+## Quick Start (local, zero cloud accounts)
 
 ```bash
-# Download the project
-git clone https://github.com/vito-zbw/brewlog.git
-cd brewlog
-
-# Install dependencies (takes a minute or two)
 npm install
-
-# Start the app
+npm run db:reset    # creates data/brewlog.db from schema.sql + seed.sql
 npm run dev
 ```
 
-> If you don't have `git`, click the green **"Code"** button on the GitHub page, choose **"Download ZIP"**, unzip it, then open a terminal inside that folder.
+Open [http://localhost:3000](http://localhost:3000). The committed `.env.local` default
+(`TURSO_DATABASE_URL=file:./data/brewlog.db`) keeps everything on local disk.
 
-The database auto-initializes with sample data on first run.
+### Database scripts
 
-### Open the app
+| Script             | What it does                                                |
+| ------------------ | ----------------------------------------------------------- |
+| `npm run db:init`  | Apply `schema.sql` (safe to re-run — `CREATE TABLE IF NOT EXISTS`) |
+| `npm run db:seed`  | Apply schema + `seed.sql` mock data                          |
+| `npm run db:reset` | Delete the local db file, then schema + seed (file: URLs only) |
 
-Once `npm run dev` is running, open your browser and go to:
-
-**http://localhost:3000**
-
-Leave the terminal open — closing it stops the app. To stop it manually, press `Ctrl + C`.
-
-### Next time you want to open the app
-
-You don't need to install anything again. Just open a terminal and run:
+### Verification
 
 ```bash
-cd brewlog
-npm run dev
+npm run verify      # typecheck → lint → build → Playwright e2e (isolated data/test.db)
 ```
 
-Then open **http://localhost:3000** in your browser.
+## Going to Production
+
+Cloud setup steps that need a browser (Turso account, Vercel, etc.) are documented as
+self-contained guides in [`docs/setup/`](docs/setup/README.md) — paste one into a new
+Claude Code session and say "help me complete this process".
+
+1. [`docs/setup/turso-setup.md`](docs/setup/turso-setup.md) — create the cloud database
+2. [`docs/setup/vercel-deploy.md`](docs/setup/vercel-deploy.md) — deploy to Vercel
+
+All env vars are documented in `.env.example`.
 
 ## Project Structure
 
 ```
-data/           → SQLite database, schema, and seed data
-src/app/        → Next.js pages and API routes
-src/components/ → Reusable UI components
-src/lib/        → Database connection and helpers
-src/types/      → Shared TypeScript interfaces
+brewlog/
+├── CLAUDE.md          # Instructions for Claude Code
+├── Readme.md          # This file
+├── schema.sql         # Database schema (source of truth)
+├── seed.sql           # Mock data (Guangzhou-centered)
+├── docs/setup/        # Paste-into-Claude setup guides for cloud services
+├── scripts/           # init-db.mjs and friends
+├── tests/             # Playwright e2e suite
+├── src/
+│   ├── app/           # Pages and API routes
+│   ├── components/    # Reusable UI components
+│   ├── lib/           # db client, queries/, bilingual terms
+│   └── types/         # TypeScript type definitions
+└── .env.local         # Database credentials (gitignored)
 ```
 
-## Database
+## Language
 
-The schema is defined in `data/schema.sql`. The SQLite database file (`data/brewlog.db`) is gitignored and created automatically on first run.
+UI is in Simplified Chinese (简体中文). Coffee terminology is bilingual (中文 English),
+e.g. "水洗 Washed", "花香 Floral" — Chinese first. Bean and roaster names stay in their
+original language. The database stores canonical English values for closed lists
+(processing method, roast level, brew method); display labels live in `src/lib/terms.ts`.
 
-To reset the database, delete `data/brewlog.db` and restart the server.
+## Roadmap
+
+- **Phase 1** ✅ — Private coffee journal (MVP): bean library, café map, visit logging, visit history
+- **Phase 2** — Photos and polish: image uploads (Cloudflare R2), dashboard with stats, improved filters
+- **Phase 3** — Multi-user: authentication (Auth.js), user profiles, custom domain
+- **Phase 4** — Social and discovery: follow system, activity feed, public pages, shareable links
 
 ## Current Status
 
-**MVP** — private use for 3 users, no authentication, no public sharing.
+**Phase 1 (MVP) complete** — private use for 3 users (name dropdown, no authentication, no public access).

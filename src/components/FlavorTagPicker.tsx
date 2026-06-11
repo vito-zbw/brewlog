@@ -1,20 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { TASTING_TAGS } from "@/lib/terms";
 
 interface FlavorTagPickerProps {
   value: string[];
   onChange: (tags: string[]) => void;
 }
-
-const COMMON_TAGS = [
-  "blueberry", "strawberry", "citrus", "lemon", "orange", "grapefruit",
-  "tropical fruit", "peach", "mango", "passionfruit", "lychee",
-  "dark chocolate", "milk chocolate", "caramel", "toffee", "honey",
-  "vanilla", "hazelnut", "almond", "peanut",
-  "jasmine", "rose", "bergamot", "cinnamon",
-  "wine", "champagne", "brown sugar", "molasses",
-];
 
 export function FlavorTagPicker({ value, onChange }: FlavorTagPickerProps) {
   const [customTag, setCustomTag] = useState("");
@@ -28,7 +20,7 @@ export function FlavorTagPicker({ value, onChange }: FlavorTagPickerProps) {
   };
 
   const addCustomTag = () => {
-    const tag = customTag.trim().toLowerCase();
+    const tag = customTag.trim();
     if (tag && !value.includes(tag)) {
       onChange([...value, tag]);
       setCustomTag("");
@@ -38,10 +30,11 @@ export function FlavorTagPicker({ value, onChange }: FlavorTagPickerProps) {
   return (
     <div>
       <div className="flex flex-wrap gap-1.5 mb-3">
-        {COMMON_TAGS.map((tag) => (
+        {TASTING_TAGS.map((tag) => (
           <button
             key={tag}
             type="button"
+            data-testid="flavor-tag"
             onClick={() => toggleTag(tag)}
             className={`text-xs px-2.5 py-1 rounded-full transition-colors ${
               value.includes(tag)
@@ -64,15 +57,17 @@ export function FlavorTagPicker({ value, onChange }: FlavorTagPickerProps) {
               addCustomTag();
             }
           }}
-          placeholder="Add custom tag..."
+          placeholder="添加自定义标签…"
+          data-testid="flavor-custom-input"
           className="flex-1 px-3 py-1.5 text-sm border border-cream-dark rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-terracotta/30"
         />
         <button
           type="button"
           onClick={addCustomTag}
+          data-testid="flavor-custom-add"
           className="px-3 py-1.5 text-sm bg-cream-dark text-warm-gray rounded-lg hover:bg-cream-dark/80"
         >
-          Add
+          添加
         </button>
       </div>
     </div>

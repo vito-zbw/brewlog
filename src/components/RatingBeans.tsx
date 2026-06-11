@@ -12,7 +12,7 @@ const sizeClasses = {
 
 export function RatingBeans({ rating, max = 5, size = "md" }: RatingBeansProps) {
   return (
-    <span className={`inline-flex gap-0.5 ${sizeClasses[size]}`} aria-label={`${rating} out of ${max}`}>
+    <span className={`inline-flex gap-0.5 ${sizeClasses[size]}`} aria-label={`${rating} / ${max} 分`}>
       {Array.from({ length: max }, (_, i) => (
         <span
           key={i}

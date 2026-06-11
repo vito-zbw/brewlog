@@ -22,5 +22,10 @@ npm-debug.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# database
-data/brewlog.db
+# database & uploads (runtime artifacts)
+/data/
+
+# playwright
+/playwright/.auth/
+/test-results/
+/playwright-report/

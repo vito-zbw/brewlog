@@ -1,24 +1,14 @@
-import { getDb } from "@/lib/db";
 import { notFound } from "next/navigation";
-import type { Bean, VisitWithDetails } from "@/types";
-import { RatingBeans } from "@/components/RatingBeans";
 import Link from "next/link";
-
-interface VisitRow {
-  id: number;
-  cafe_id: number;
-  visited_by: string;
-  visit_date: string;
-  brew_method: string;
-  rating_overall: number;
-  rating_bean_quality: number;
-  rating_barista_skill: number;
-  rating_ambiance: number;
-  notes: string | null;
-  created_at: string;
-  cafe_name: string;
-  cafe_city: string;
-}
+import { getBeanWithVisits } from "@/lib/queries";
+import {
+  BREW_METHODS,
+  PROCESSING_METHODS,
+  ROAST_LEVELS,
+  formatVisitDate,
+  optionLabel,
+} from "@/lib/terms";
+import { RatingBeans } from "@/components/RatingBeans";
 
 export const dynamic = "force-dynamic";
 
@@ -28,39 +18,22 @@ export default async function BeanDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const db = getDb();
-
-  const bean = db.prepare("SELECT * FROM beans WHERE id = ?").get(Number(id)) as
-    | Bean
-    | undefined;
+  const beanId = Number(id);
+  if (!Number.isInteger(beanId) || beanId <= 0) {
+    notFound();
+  }
+  const bean = await getBeanWithVisits(beanId);
 
   if (!bean) {
     notFound();
   }
 
-  const tags = bean.tasting_notes_tags?.split(",").map((t) => t.trim()) ?? [];
-
-  const visitRows = db
-    .prepare(
-      `SELECT v.*, c.name as cafe_name, c.city as cafe_city
-       FROM visits v
-       JOIN cafes c ON c.id = v.cafe_id
-       JOIN visit_beans vb ON vb.visit_id = v.id
-       WHERE vb.bean_id = ?
-       ORDER BY v.visit_date DESC`
-    )
-    .all(bean.id) as VisitRow[];
-
-  const visits: VisitWithDetails[] = visitRows.map((row) => {
-    const beans = db
-      .prepare(
-        `SELECT b.* FROM beans b
-         JOIN visit_beans vb ON vb.bean_id = b.id
-         WHERE vb.visit_id = ?`
-      )
-      .all(row.id) as Bean[];
-    return { ...row, beans };
-  });
+  const tags =
+    bean.tasting_notes_tags
+      ?.split(",")
+      .map((t) => t.trim())
+      .filter(Boolean) ?? [];
+  const visits = bean.visits;
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -68,7 +41,7 @@ export default async function BeanDetailPage({
         href="/beans"
         className="text-terracotta hover:underline text-sm mb-4 inline-block"
       >
-        &larr; Back to Bean Library
+        &larr; 返回咖啡豆库
       </Link>
 
       <div className="bg-white rounded-xl shadow-sm border border-cream-dark/50 p-8 mb-8">
@@ -84,7 +57,7 @@ export default async function BeanDetailPage({
           {bean.roaster && (
             <div>
               <p className="text-xs text-warm-gray/70 uppercase tracking-wider">
-                Roaster
+                烘焙商
               </p>
               <p className="text-sm font-medium text-espresso">{bean.roaster}</p>
             </div>
@@ -92,25 +65,25 @@ export default async function BeanDetailPage({
           {bean.farm && (
             <div>
               <p className="text-xs text-warm-gray/70 uppercase tracking-wider">
-                Farm
+                庄园
               </p>
               <p className="text-sm font-medium text-espresso">{bean.farm}</p>
             </div>
           )}
           <div>
             <p className="text-xs text-warm-gray/70 uppercase tracking-wider">
-              Processing
+              处理法
             </p>
             <p className="text-sm font-medium text-espresso">
-              {bean.processing_method}
+              {optionLabel(PROCESSING_METHODS, bean.processing_method)}
             </p>
           </div>
           <div>
             <p className="text-xs text-warm-gray/70 uppercase tracking-wider">
-              Roast Level
+              烘焙度
             </p>
             <p className="text-sm font-medium text-espresso">
-              {bean.roast_level}
+              {optionLabel(ROAST_LEVELS, bean.roast_level)}
             </p>
           </div>
         </div>
@@ -118,7 +91,7 @@ export default async function BeanDetailPage({
         {tags.length > 0 && (
           <div className="mb-6">
             <p className="text-xs text-warm-gray/70 uppercase tracking-wider mb-2">
-              Tasting Notes
+              风味标签
             </p>
             <div className="flex flex-wrap gap-2">
               {tags.map((tag) => (
@@ -136,7 +109,7 @@ export default async function BeanDetailPage({
         {bean.tasting_notes_freetext && (
           <div>
             <p className="text-xs text-warm-gray/70 uppercase tracking-wider mb-2">
-              Description
+              风味描述
             </p>
             <p className="text-sm text-warm-gray leading-relaxed">
               {bean.tasting_notes_freetext}
@@ -146,53 +119,44 @@ export default async function BeanDetailPage({
       </div>
 
       <h2 className="text-2xl font-bold font-[Playfair_Display] text-espresso mb-4">
-        Visits featuring this bean ({visits.length})
+        包含此豆的探店记录（{visits.length}）
       </h2>
 
       {visits.length === 0 ? (
         <p className="text-warm-gray text-center py-8">
-          No visits have tried this bean yet.
+          还没有探店记录用过这支豆。
         </p>
       ) : (
         <div className="space-y-4">
-          {visits.map((visit) => {
-            const formattedDate = new Date(
-              visit.visit_date
-            ).toLocaleDateString("en-SG", {
-              year: "numeric",
-              month: "short",
-              day: "numeric",
-            });
-            return (
-              <div
-                key={visit.id}
-                className="bg-white rounded-xl shadow-sm border border-cream-dark/50 p-5"
-              >
-                <div className="flex items-start justify-between mb-2">
-                  <div>
-                    <h3 className="font-[Playfair_Display] font-semibold text-espresso">
-                      {visit.cafe_name}
-                    </h3>
-                    <p className="text-warm-gray text-sm">
-                      {visit.cafe_city} &middot; {formattedDate} &middot;{" "}
-                      {visit.brew_method}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <RatingBeans rating={visit.rating_overall} />
-                    <p className="text-xs text-warm-gray mt-1">
-                      by {visit.visited_by}
-                    </p>
-                  </div>
-                </div>
-                {visit.notes && (
-                  <p className="text-sm text-warm-gray leading-relaxed">
-                    {visit.notes}
+          {visits.map((visit) => (
+            <div
+              key={visit.id}
+              className="bg-white rounded-xl shadow-sm border border-cream-dark/50 p-5"
+            >
+              <div className="flex items-start justify-between mb-2">
+                <div>
+                  <h3 className="font-[Playfair_Display] font-semibold text-espresso">
+                    {visit.cafe_name}
+                  </h3>
+                  <p className="text-warm-gray text-sm">
+                    {visit.cafe_city} &middot; {formatVisitDate(visit.visit_date)}{" "}
+                    &middot; {optionLabel(BREW_METHODS, visit.brew_method)}
                   </p>
-                )}
+                </div>
+                <div className="text-right">
+                  <RatingBeans rating={visit.rating_overall} />
+                  <p className="text-xs text-warm-gray mt-1">
+                    {visit.visited_by} 记录
+                  </p>
+                </div>
               </div>
-            );
-          })}
+              {visit.notes && (
+                <p className="text-sm text-warm-gray leading-relaxed">
+                  {visit.notes}
+                </p>
+              )}
+            </div>
+          ))}
         </div>
       )}
     </div>

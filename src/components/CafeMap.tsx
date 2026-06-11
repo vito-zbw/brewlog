@@ -6,26 +6,46 @@ import type { CafeWithStats } from "@/types";
 export function CafeMap() {
   const [cafes, setCafes] = useState<CafeWithStats[]>([]);
   const [MapComponent, setMapComponent] = useState<React.ComponentType<{ cafes: CafeWithStats[] }> | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
-      const res = await fetch("/api/cafes");
-      const json = await res.json();
-      setCafes(json.data);
+      try {
+        const res = await fetch("/api/cafes");
+        if (!res.ok) {
+          throw new Error(`请求失败：${res.status}`);
+        }
+        const json: { data?: CafeWithStats[] } = await res.json();
+        setCafes(json.data ?? []);
 
-      const mod = await import("./CafeMapInner");
-      setMapComponent(() => mod.CafeMapInner);
+        const mod = await import("./CafeMapInner");
+        setMapComponent(() => mod.CafeMapInner);
+      } catch {
+        setError("咖啡馆数据加载失败，请稍后重试。");
+      }
     }
     load();
   }, []);
 
-  if (!MapComponent) {
+  if (error) {
     return (
       <div className="h-full w-full flex items-center justify-center bg-cream-dark">
-        <p className="text-warm-gray">Loading map...</p>
+        <p className="text-terracotta">{error}</p>
       </div>
     );
   }
 
-  return <MapComponent cafes={cafes} />;
+  if (!MapComponent) {
+    return (
+      <div className="h-full w-full flex items-center justify-center bg-cream-dark">
+        <p className="text-warm-gray">地图加载中…</p>
+      </div>
+    );
+  }
+
+  return (
+    <div data-testid="cafe-map" className="h-full w-full">
+      <MapComponent cafes={cafes} />
+    </div>
+  );
 }
