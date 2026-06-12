@@ -116,10 +116,12 @@ All env vars BrewLog will ever need (also documented in the committed `.env.exam
 | `R2_SECRET_ACCESS_KEY` | Phase 2 | Yes, when building Phase 2 |
 | `R2_BUCKET_NAME` | Phase 2 | Yes, when building Phase 2 |
 | `R2_PUBLIC_URL` | Phase 2 | Yes, when building Phase 2 |
-| `AUTH_SECRET` | Phase 3 (auth) | Yes, when building Phase 3 (see `docs/setup/oauth-setup.md`) |
+| `AUTH_SECRET` | **Phase 3+ — required at deploy time** | **Yes** — the app 500s without it (every route checks the session). Generate: `openssl rand -base64 33` |
 | `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` | Phase 3 | Yes, if using Google login |
 | `AUTH_GITHUB_ID` / `AUTH_GITHUB_SECRET` | Phase 3 | Yes, if using GitHub login |
 | `AUTH_DEV_LOGIN` | Phase 3, dev only | **NO — NEVER.** This enables a one-click login bypass for local development. Setting it on Vercel would let anyone log in as anyone. |
+| `AUTH_TRUST_HOST` | Phase 3, local only | No — Vercel is auto-trusted. Only needed in `.env.local` for `next start` on localhost |
+| `AUTH_URL` | Phase 3, optional | Usually no — auto-detected on Vercel. Set to `https://yourdomain.com` only if login redirects misbehave after adding a custom domain (see `docs/setup/custom-domain.md`) |
 
 ## Values to collect 需要收集的值
 
@@ -132,22 +134,23 @@ All env vars BrewLog will ever need (also documented in the committed `.env.exam
 
 ## Verify 验证
 
-1. Open `https://<project>.vercel.app/beans` in a browser — you should see the bean library with the **8 seed beans** (Chinese UI: 豆库 with names like Ethiopian/Yunnan beans from `seed.sql`).
+Since Phase 3, the deployed app requires login — anonymous requests being turned away **is the success signal**:
+
+1. Open `https://<project>.vercel.app/beans` in a browser — you should be **redirected to the login page** (登录 BrewLog). That means the app booted, the database is reachable, and route protection works. (The login page shows Google/GitHub buttons only after `docs/setup/oauth-setup.md`; before that it may say 暂无可用的登录方式 — still a successful deploy.)
 2. From the terminal (replace with your URL):
 
 ```bash
-curl -s https://<project>.vercel.app/api/beans | head -c 200
+curl -s -w " [%{http_code}]" https://<project>.vercel.app/api/beans
 ```
 
-Expected output starts with:
+Expected output:
 
 ```
-{"data":
+{"error":"未登录"} [401]
 ```
 
-followed by a JSON array of bean objects. If you see `{"error":` or HTML, go to Troubleshooting.
-
-Also spot-check `/cafes` (map with 7 cafés, centered on Guangzhou) and `/visits` (9 visits).
+That 401 is correct — the API rejects anonymous callers. A `500`, HTML error page, or connection failure means something is wrong → Troubleshooting.
+3. Full end-to-end check (seed beans, map, visits) is only possible after real login — complete `docs/setup/oauth-setup.md`, sign in on the deployed site, then check `/beans` (8 seed beans), `/cafes` (7 cafés on a Guangzhou-centered map), and `/visits` (9 visits).
 
 ## Troubleshooting 排错
 

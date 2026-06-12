@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 import { deletePhoto, getPhoto } from "@/lib/queries";
 import { deletePhotoObject } from "@/lib/storage";
+import { requireUserId, UnauthorizedError } from "@/lib/auth-helpers";
 
 export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await requireUserId();
     const { id } = await params;
     const photoId = Number(id);
     if (!Number.isInteger(photoId) || photoId <= 0) {
@@ -31,6 +33,9 @@ export async function DELETE(
     }
     return NextResponse.json({ data: { id: photoId } });
   } catch (err) {
+    if (err instanceof UnauthorizedError) {
+      return NextResponse.json({ error: "未登录" }, { status: 401 });
+    }
     console.error("DELETE /api/photos/[id] failed:", err);
     return NextResponse.json({ error: "删除照片失败" }, { status: 500 });
   }

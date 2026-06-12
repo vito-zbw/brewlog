@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { auth } from "@/auth";
 import { getDashboardStats, getVisitsWithBeans } from "@/lib/queries";
 import { Dashboard } from "@/components/Dashboard";
 import { VisitCard } from "@/components/VisitCard";
@@ -6,7 +7,8 @@ import { VisitCard } from "@/components/VisitCard";
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const [stats, recentVisits] = await Promise.all([
+  const [session, stats, recentVisits] = await Promise.all([
+    auth(),
     getDashboardStats(),
     getVisitsWithBeans({ limit: 3 }),
   ]);
@@ -71,7 +73,7 @@ export default async function Home() {
         </Link>
       </div>
 
-      <Dashboard />
+      <Dashboard userName={session?.user?.name ?? ""} />
 
       <div>
         <h2 className="text-2xl font-bold font-[Playfair_Display] text-espresso mb-6">

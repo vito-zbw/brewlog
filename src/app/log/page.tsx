@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Bean, Cafe } from "@/types";
-import { BREW_METHODS, TEAM_MEMBERS, type TeamMember } from "@/lib/terms";
-import { useCurrentUser } from "@/lib/useCurrentUser";
+import { BREW_METHODS } from "@/lib/terms";
 import { RatingInput } from "@/components/RatingInput";
 import { NewBeanForm } from "@/components/NewBeanForm";
 
@@ -41,7 +40,6 @@ export default function NewVisitPage() {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
 
-  const [visitedBy, setVisitedBy] = useCurrentUser();
   const [cafeId, setCafeId] = useState("");
   const [isNewCafe, setIsNewCafe] = useState(false);
   const [newCafe, setNewCafe] = useState({ name: "", city: "", country: "", lat: "", lng: "" });
@@ -97,7 +95,6 @@ export default function NewVisitPage() {
             country: newCafe.country,
             latitude: parseFloat(newCafe.lat),
             longitude: parseFloat(newCafe.lng),
-            created_by: visitedBy,
           }),
         });
         const cafeJson = (await cafeRes.json()) as { data?: Cafe; error?: string };
@@ -123,7 +120,6 @@ export default function NewVisitPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           cafe_id: finalCafeId,
-          visited_by: visitedBy,
           visit_date: visitDate,
           brew_method: brewMethod,
           rating_overall: ratings.overall,
@@ -155,15 +151,6 @@ export default function NewVisitPage() {
       <h1 className="text-3xl font-bold font-[Playfair_Display] text-espresso mb-6">记录探店</h1>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        <div className={cardClass}>
-          <label className="block text-sm font-medium text-espresso mb-2">你的名字</label>
-          <select data-testid="log-user-select" value={visitedBy} onChange={(e) => setVisitedBy(e.target.value as TeamMember)} className={inputClass}>
-            {TEAM_MEMBERS.map((m) => (
-              <option key={m} value={m}>{m}</option>
-            ))}
-          </select>
-        </div>
-
         <div className={cardClass}>
           <h2 className={headingClass}>咖啡馆</h2>
           <div className="flex gap-4 mb-4">
@@ -231,7 +218,7 @@ export default function NewVisitPage() {
               + 添加新豆
             </button>
           ) : (
-            <NewBeanForm createdBy={visitedBy} onCreated={handleBeanCreated} onCancel={() => setShowNewBean(false)} />
+            <NewBeanForm onCreated={handleBeanCreated} onCancel={() => setShowNewBean(false)} />
           )}
         </div>
 

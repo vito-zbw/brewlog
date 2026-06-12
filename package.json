@@ -12,6 +12,7 @@
     "db:seed": "node --env-file-if-exists=.env.local scripts/init-db.mjs --seed",
     "db:reset": "node --env-file-if-exists=.env.local scripts/init-db.mjs --reset --seed",
     "db:init:test": "node scripts/init-db.mjs file:./data/test.db --reset --seed",
+    "migrate:phase3": "node --env-file-if-exists=.env.local scripts/migrate-phase3.mjs",
     "test:e2e": "npm run build && npm run db:init:test && playwright test",
     "verify": "npm run typecheck && npm run lint && npm run test:e2e"
   },
@@ -20,6 +21,7 @@
     "@libsql/client": "^0.17.3",
     "leaflet": "^1.9.4",
     "next": "16.2.2",
+    "next-auth": "^5.0.0-beta.31",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-leaflet": "^5.0.0"

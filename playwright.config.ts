@@ -7,6 +7,11 @@ const BASE_URL = `http://localhost:${PORT}`;
 // with their own throwaway database. Reset happens in the npm script
 // (`db:init:test`) BEFORE Playwright boots the server — never while the
 // server holds the file handle.
+//
+// Auth: the `setup` project logs in via the dev-login provider and saves
+// storage states; the main project runs every spec as Baiwei (user1).
+// Logged-out specs opt out via test.use({ storageState: { cookies: [],
+// origins: [] } }); Friend2 specs use playwright/.auth/user2.json.
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: false,
@@ -21,7 +26,17 @@ export default defineConfig({
     trace: "on-first-retry",
     screenshot: "only-on-failure",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    { name: "setup", testMatch: /auth\.setup\.ts/ },
+    {
+      name: "chromium",
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: "playwright/.auth/user1.json",
+      },
+      dependencies: ["setup"],
+    },
+  ],
   webServer: {
     command: `npm run start -- --port ${PORT}`,
     url: BASE_URL,
@@ -29,6 +44,12 @@ export default defineConfig({
     timeout: 60_000,
     env: {
       TURSO_DATABASE_URL: "file:./data/test.db",
+      // Fixed secret so saved storage states survive webServer restarts
+      // within a run (a random secret would invalidate the cookies).
+      AUTH_SECRET: "brewlog-e2e-fixed-test-secret",
+      AUTH_DEV_LOGIN: "true",
+      AUTH_TRUST_HOST: "true",
+      AUTH_URL: BASE_URL,
     },
   },
 });

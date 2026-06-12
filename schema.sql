@@ -1,10 +1,20 @@
 -- BrewLog Database Schema
 -- Single source of truth for the data model.
 -- Apply with `npm run db:init` (local) or `turso db shell brewlog < schema.sql` (cloud).
+-- Fresh installs get this final shape directly; databases created before
+-- Phase 3 are upgraded with scripts/migrate-phase3.mjs.
 --
 -- Enum-like columns (processing_method, roast_level, brew_method) store canonical
 -- English values; the bilingual "中文 English" display labels live in src/lib/terms.ts.
 -- tasting_notes_tags stores the full bilingual display strings, comma-separated.
+
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT NOT NULL UNIQUE,                  -- OAuth identity key (same email = same user across providers)
+    name TEXT NOT NULL,                          -- display name; kept stable across OAuth sign-ins
+    image TEXT,                                  -- avatar URL from the OAuth provider
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 
 CREATE TABLE IF NOT EXISTS beans (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -17,7 +27,7 @@ CREATE TABLE IF NOT EXISTS beans (
     roast_level TEXT NOT NULL DEFAULT 'Medium',       -- Light | Medium-Light | Medium | Medium-Dark | Dark
     tasting_notes_tags TEXT,                     -- comma-separated bilingual tags, e.g. "果香 Fruity,花香 Floral"
     tasting_notes_freetext TEXT,                 -- free-form description
-    created_by TEXT NOT NULL,                    -- username string (Phase 1-2; becomes user_id in Phase 3)
+    user_id INTEGER NOT NULL REFERENCES users(id),
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -29,14 +39,14 @@ CREATE TABLE IF NOT EXISTS cafes (
     latitude REAL NOT NULL,                      -- for map pin placement
     longitude REAL NOT NULL,
     website TEXT,                                -- optional URL
-    created_by TEXT NOT NULL,
+    user_id INTEGER NOT NULL REFERENCES users(id),
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS visits (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     cafe_id INTEGER NOT NULL REFERENCES cafes(id),
-    visited_by TEXT NOT NULL,                    -- username string (Phase 1-2; becomes user_id in Phase 3)
+    user_id INTEGER NOT NULL REFERENCES users(id),
     visit_date DATE NOT NULL,                    -- e.g. "2026-04-01"
     brew_method TEXT NOT NULL,                   -- Espresso | V60 | Chemex | Aeropress | French Press | Siphon | Cold Brew | Moka Pot | Auto Drip | Other
     rating_overall INTEGER NOT NULL CHECK(rating_overall BETWEEN 1 AND 5),
@@ -60,7 +70,7 @@ CREATE TABLE IF NOT EXISTS photos (
     storage_key TEXT NOT NULL,                   -- key in R2 / data/uploads; public URL computed at read time
     content_type TEXT NOT NULL,                  -- e.g. image/jpeg
     caption TEXT,
-    created_by TEXT NOT NULL,
+    user_id INTEGER NOT NULL REFERENCES users(id),
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -70,5 +80,5 @@ CREATE INDEX IF NOT EXISTS idx_beans_roaster ON beans(roaster);
 CREATE INDEX IF NOT EXISTS idx_cafes_city ON cafes(city);
 CREATE INDEX IF NOT EXISTS idx_visits_cafe ON visits(cafe_id);
 CREATE INDEX IF NOT EXISTS idx_visits_date ON visits(visit_date DESC);
-CREATE INDEX IF NOT EXISTS idx_visits_visitor ON visits(visited_by);
+CREATE INDEX IF NOT EXISTS idx_visits_user ON visits(user_id);
 CREATE INDEX IF NOT EXISTS idx_photos_entity ON photos(entity_type, entity_id);

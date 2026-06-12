@@ -2,7 +2,6 @@
 
 import { useState, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
-import { useCurrentUser } from "@/lib/useCurrentUser";
 import type { Photo, PhotoEntityType } from "@/types";
 
 const MAX_DIMENSION = 1600;
@@ -60,7 +59,6 @@ async function downscaleToJpeg(file: File): Promise<Blob> {
 }
 
 export function PhotoUpload({ entityType, entityId }: PhotoUploadProps) {
-  const [user] = useCurrentUser();
   const router = useRouter();
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
@@ -79,7 +77,6 @@ export function PhotoUpload({ entityType, entityId }: PhotoUploadProps) {
       formData.append("file", blob, "photo.jpg");
       formData.append("entity_type", entityType);
       formData.append("entity_id", String(entityId));
-      formData.append("created_by", user);
       if (caption.trim()) formData.append("caption", caption.trim());
 
       const res = await fetch("/api/photos", {

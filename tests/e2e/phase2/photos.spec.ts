@@ -61,17 +61,16 @@ test.describe("photos", () => {
   test("API rejects uploads without a file or with an invalid entity_type", async ({
     request,
   }) => {
+    // No created_by field — the uploader is taken from the session.
     const noFile = await request.post("/api/photos", {
       multipart: {
         entity_type: "visit",
         entity_id: "1",
-        created_by: "Baiwei",
       },
     });
     expect(noFile.status()).toBe(400);
     const noFileBody = (await noFile.json()) as { error?: string };
-    expect(typeof noFileBody.error).toBe("string");
-    expect(noFileBody.error).not.toBe("");
+    expect(noFileBody.error).toBe("照片为必填项");
 
     const badType = await request.post("/api/photos", {
       multipart: {
@@ -82,13 +81,11 @@ test.describe("photos", () => {
         },
         entity_type: "teapot",
         entity_id: "1",
-        created_by: "Baiwei",
       },
     });
     expect(badType.status()).toBe(400);
     const badTypeBody = (await badType.json()) as { error?: string };
-    expect(typeof badTypeBody.error).toBe("string");
-    expect(badTypeBody.error).not.toBe("");
+    expect(badTypeBody.error).toBe("关联对象无效");
   });
 
   test("API rejects photos for nonexistent entities", async ({ request }) => {
@@ -101,12 +98,11 @@ test.describe("photos", () => {
         },
         entity_type: "visit",
         entity_id: "999999",
-        created_by: "Baiwei",
       },
     });
     expect(orphan.status()).toBe(404);
     const body = (await orphan.json()) as { error?: string };
-    expect(typeof body.error).toBe("string");
+    expect(body.error).toBe("关联对象不存在");
   });
 
   test("deletes a photo through the gallery ✕ button", async ({ page }) => {

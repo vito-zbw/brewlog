@@ -60,9 +60,6 @@ export const TASTING_TAGS: readonly string[] = [
   "黄油 Butter",
 ];
 
-export const TEAM_MEMBERS = ["Baiwei", "Friend1", "Friend2"] as const;
-export type TeamMember = (typeof TEAM_MEMBERS)[number];
-
 export function optionLabel(
   options: readonly BilingualOption[],
   value: string

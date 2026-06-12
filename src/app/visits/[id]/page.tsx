@@ -56,7 +56,12 @@ export default async function VisitDetailPage({
         </h1>
         <p className="text-warm-gray text-sm mb-4">
           {visit.cafe_city} &middot; {formatVisitDate(visit.visit_date)} &middot;{" "}
-          {visit.visited_by} 记录
+          <Link
+            href={`/users/${visit.user_id}`}
+            className="hover:underline"
+          >
+            {visit.user_name} 记录
+          </Link>
         </p>
 
         <div className="mb-6">

@@ -104,7 +104,7 @@ test.describe("Phase 1 API", () => {
     const res = await request.post("/api/beans", { data: {} });
     expect(res.status()).toBe(400);
     const body = (await res.json()) as { error: string };
-    expect(body.error).toBe("豆名、产地国家和记录人为必填项");
+    expect(body.error).toBe("豆名和产地国家为必填项");
   });
 
   test("POST /api/beans creates a bean findable via ?search", async ({
@@ -115,7 +115,6 @@ test.describe("Phase 1 API", () => {
       data: {
         name: beanName,
         origin_country: "Panama",
-        created_by: "Baiwei",
         processing_method: "Washed",
         roast_level: "Light",
       },

@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import type { BrewStat, OriginStat, UserStats } from "@/types";
 import { mapRows, firstRow } from "./util";
 
-export async function getUserStats(user: string): Promise<UserStats> {
+export async function getUserStats(userId: number): Promise<UserStats> {
   // "Beans tried" counts distinct beans across the user's visits — not beans
   // the user happened to create in the catalog.
   const totals = firstRow<{
@@ -15,10 +15,10 @@ export async function getUserStats(user: string): Promise<UserStats> {
               (SELECT COUNT(DISTINCT vb.bean_id)
                  FROM visit_beans vb
                  JOIN visits v ON v.id = vb.visit_id
-                WHERE v.visited_by = ?) AS total_beans_tried,
-              (SELECT COUNT(DISTINCT cafe_id) FROM visits WHERE visited_by = ?) AS total_cafes_visited,
-              (SELECT COUNT(*) FROM visits WHERE visited_by = ?) AS total_visits`,
-      args: [user, user, user],
+                WHERE v.user_id = ?) AS total_beans_tried,
+              (SELECT COUNT(DISTINCT cafe_id) FROM visits WHERE user_id = ?) AS total_cafes_visited,
+              (SELECT COUNT(*) FROM visits WHERE user_id = ?) AS total_visits`,
+      args: [userId, userId, userId],
     })
   );
 
@@ -34,11 +34,11 @@ export async function getUserStats(user: string): Promise<UserStats> {
                   FROM visits v
                   JOIN visit_beans vb ON vb.visit_id = v.id
                   JOIN beans b ON b.id = vb.bean_id
-                  WHERE v.visited_by = ?)
+                  WHERE v.user_id = ?)
             GROUP BY origin_country
             ORDER BY avg_rating DESC, visit_count DESC, origin_country
             LIMIT 5`,
-      args: [user],
+      args: [userId],
     })
   );
 
@@ -46,10 +46,10 @@ export async function getUserStats(user: string): Promise<UserStats> {
     await db.execute({
       sql: `SELECT brew_method, COUNT(*) AS count
             FROM visits
-            WHERE visited_by = ?
+            WHERE user_id = ?
             GROUP BY brew_method
             ORDER BY count DESC, brew_method`,
-      args: [user],
+      args: [userId],
     })
   );
 

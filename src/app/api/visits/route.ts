@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getVisitsWithBeans, createVisit } from "@/lib/queries";
 import { BREW_METHODS } from "@/lib/terms";
+import { requireUserId, UnauthorizedError } from "@/lib/auth-helpers";
 
 function isValidRating(value: unknown): boolean {
-  return typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 5;
+  return (
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    value >= 1 &&
+    value <= 5
+  );
 }
 
 function isPositiveInteger(value: unknown): boolean {
@@ -16,7 +22,7 @@ export async function GET(request: NextRequest) {
     const limit = params.get("limit");
     const visits = await getVisitsWithBeans({
       cafeId: params.get("cafe_id") ? Number(params.get("cafe_id")) : undefined,
-      visitedBy: params.get("visited_by") ?? undefined,
+      userId: params.get("user_id") ? Number(params.get("user_id")) : undefined,
       beanId: params.get("bean_id") ? Number(params.get("bean_id")) : undefined,
       limit: limit ? Number(limit) : undefined,
     });
@@ -29,13 +35,13 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const userId = await requireUserId();
     const body = await request.json().catch(() => null);
     if (!body) {
       return NextResponse.json({ error: "请求格式错误" }, { status: 400 });
     }
     if (
       !body.cafe_id ||
-      !body.visited_by ||
       !body.visit_date ||
       !body.brew_method ||
       !body.rating_overall ||
@@ -68,9 +74,16 @@ export async function POST(request: NextRequest) {
     if (!BREW_METHODS.some((o) => o.value === body.brew_method)) {
       return NextResponse.json({ error: "冲煮方式无效" }, { status: 400 });
     }
-    const visit = await createVisit({ ...body, cafe_id: Number(body.cafe_id) });
+    const visit = await createVisit({
+      ...body,
+      cafe_id: Number(body.cafe_id),
+      user_id: userId,
+    });
     return NextResponse.json({ data: visit }, { status: 201 });
   } catch (err) {
+    if (err instanceof UnauthorizedError) {
+      return NextResponse.json({ error: "未登录" }, { status: 401 });
+    }
     console.error("POST /api/visits failed:", err);
     return NextResponse.json({ error: "创建探店记录失败" }, { status: 500 });
   }

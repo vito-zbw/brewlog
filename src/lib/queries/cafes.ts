@@ -26,7 +26,7 @@ export async function getCafe(id: number): Promise<Cafe | null> {
 
 export async function createCafe(input: NewCafeInput): Promise<Cafe> {
   const rs = await db.execute({
-    sql: `INSERT INTO cafes (name, city, country, latitude, longitude, website, created_by)
+    sql: `INSERT INTO cafes (name, city, country, latitude, longitude, website, user_id)
           VALUES (?, ?, ?, ?, ?, ?, ?)`,
     args: [
       input.name,
@@ -35,7 +35,7 @@ export async function createCafe(input: NewCafeInput): Promise<Cafe> {
       input.latitude,
       input.longitude,
       input.website ?? null,
-      input.created_by,
+      input.user_id,
     ],
   });
   const cafe = await getCafe(insertedId(rs));

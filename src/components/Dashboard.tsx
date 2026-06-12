@@ -2,16 +2,14 @@
 
 import { useEffect, useState } from "react";
 import type { UserStats } from "@/types";
-import { BREW_METHODS, TEAM_MEMBERS, optionLabel, type TeamMember } from "@/lib/terms";
-import { useCurrentUser } from "@/lib/useCurrentUser";
+import { BREW_METHODS, optionLabel } from "@/lib/terms";
 
 interface StatsResponse {
   data?: UserStats;
   error?: string;
 }
 
-export function Dashboard() {
-  const [user, setUser] = useCurrentUser();
+export function Dashboard({ userName }: { userName: string }) {
   const [stats, setStats] = useState<UserStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -23,7 +21,7 @@ export function Dashboard() {
       setLoading(true);
       setError(false);
       try {
-        const res = await fetch(`/api/stats?user=${encodeURIComponent(user)}`, {
+        const res = await fetch("/api/stats", {
           signal: controller.signal,
         });
         if (!res.ok) {
@@ -44,7 +42,7 @@ export function Dashboard() {
 
     void load();
     return () => controller.abort();
-  }, [user]);
+  }, []);
 
   const maxCount =
     stats && stats.brew_breakdown.length > 0
@@ -57,18 +55,9 @@ export function Dashboard() {
         <h2 className="text-2xl font-bold font-[Playfair_Display] text-espresso">
           我的咖啡足迹
         </h2>
-        <select
-          data-testid="user-select"
-          value={user}
-          onChange={(e) => setUser(e.target.value as TeamMember)}
-          className="px-3 py-2 bg-white border border-cream-dark/50 rounded-xl text-sm text-espresso shadow-sm focus:outline-none focus:ring-2 focus:ring-terracotta"
-        >
-          {TEAM_MEMBERS.map((member) => (
-            <option key={member} value={member}>
-              {member}
-            </option>
-          ))}
-        </select>
+        <span data-testid="dashboard-user" className="text-warm-gray text-sm">
+          {userName}
+        </span>
       </div>
 
       {loading ? (

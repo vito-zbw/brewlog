@@ -6,7 +6,6 @@ import { PROCESSING_METHODS, ROAST_LEVELS } from "@/lib/terms";
 import { FlavorTagPicker } from "@/components/FlavorTagPicker";
 
 interface NewBeanFormProps {
-  createdBy: string;
   onCreated: (bean: Bean) => void;
   onCancel: () => void;
 }
@@ -14,7 +13,7 @@ interface NewBeanFormProps {
 const inputClass =
   "w-full px-4 py-2 border border-cream-dark rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-terracotta/30 text-sm";
 
-export function NewBeanForm({ createdBy, onCreated, onCancel }: NewBeanFormProps) {
+export function NewBeanForm({ onCreated, onCancel }: NewBeanFormProps) {
   const [name, setName] = useState("");
   const [origin, setOrigin] = useState("");
   const [region, setRegion] = useState("");
@@ -32,27 +31,31 @@ export function NewBeanForm({ createdBy, onCreated, onCancel }: NewBeanFormProps
     }
     setError("");
     setSaving(true);
-    const res = await fetch("/api/beans", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name,
-        origin_country: origin,
-        origin_region: region || null,
-        roaster: roaster || null,
-        processing_method: processing,
-        roast_level: roastLevel,
-        tasting_notes_tags: tags.join(",") || null,
-        created_by: createdBy,
-      }),
-    });
-    const json = (await res.json()) as { data?: Bean; error?: string };
-    setSaving(false);
-    if (json.error || !json.data) {
-      setError(json.error ?? "保存失败，请重试");
-      return;
+    try {
+      const res = await fetch("/api/beans", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          origin_country: origin,
+          origin_region: region || null,
+          roaster: roaster || null,
+          processing_method: processing,
+          roast_level: roastLevel,
+          tasting_notes_tags: tags.join(",") || null,
+        }),
+      });
+      const json = (await res.json()) as { data?: Bean; error?: string };
+      if (json.error || !json.data) {
+        setError(json.error ?? "保存失败，请重试");
+        return;
+      }
+      onCreated(json.data);
+    } catch {
+      setError("保存失败，请检查网络后重试");
+    } finally {
+      setSaving(false);
     }
-    onCreated(json.data);
   };
 
   return (

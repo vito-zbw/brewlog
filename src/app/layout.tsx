@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { auth, signOut } from "@/auth";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -27,11 +28,18 @@ function NavLink({
   );
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const session = await auth();
+  // Treat sessions without a numeric user id (e.g. tokens issued before
+  // Phase 3) as logged out in the nav.
+  const user =
+    session?.user && typeof session.user.id === "number"
+      ? session.user
+      : null;
   return (
     <html lang="zh-CN">
       <head>
@@ -58,7 +66,7 @@ export default function RootLayout({
                   BrewLog
                 </span>
               </Link>
-              <div className="flex items-center gap-1">
+              <div className="flex flex-wrap items-center justify-end gap-x-1 gap-y-1">
                 <NavLink href="/beans" testId="nav-beans">咖啡豆</NavLink>
                 <NavLink href="/cafes" testId="nav-cafes">咖啡馆</NavLink>
                 <NavLink href="/visits" testId="nav-visits">探店记录</NavLink>
@@ -69,6 +77,53 @@ export default function RootLayout({
                 >
                   + 记录探店
                 </Link>
+                {user ? (
+                  <>
+                    <Link
+                      href={`/users/${user.id}`}
+                      data-testid="nav-profile"
+                      className="ml-2 flex items-center gap-2 px-2 py-1.5 rounded-lg text-cream/90 hover:text-cream hover:bg-espresso-light transition-colors text-sm font-medium"
+                    >
+                      {user.image ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={user.image}
+                          alt={user.name ?? "头像"}
+                          className="h-7 w-7 rounded-full"
+                        />
+                      ) : (
+                        <span className="h-7 w-7 rounded-full bg-terracotta text-cream flex items-center justify-center text-xs font-semibold">
+                          {(user.name ?? "?").charAt(0)}
+                        </span>
+                      )}
+                      <span className="hidden sm:inline whitespace-nowrap">
+                        {user.name}
+                      </span>
+                    </Link>
+                    <form
+                      action={async () => {
+                        "use server";
+                        await signOut({ redirectTo: "/login" });
+                      }}
+                    >
+                      <button
+                        type="submit"
+                        data-testid="nav-logout"
+                        className="px-2 py-2 text-cream/70 hover:text-cream text-sm whitespace-nowrap transition-colors"
+                      >
+                        退出登录
+                      </button>
+                    </form>
+                  </>
+                ) : (
+                  <Link
+                    href="/login"
+                    data-testid="nav-login"
+                    className="ml-2 px-3 py-2 rounded-lg text-cream/80 hover:text-cream hover:bg-espresso-light transition-colors text-sm font-medium whitespace-nowrap"
+                  >
+                    登录
+                  </Link>
+                )}
               </div>
             </div>
           </div>

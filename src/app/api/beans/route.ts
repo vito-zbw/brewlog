@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { listBeans, createBean } from "@/lib/queries";
 import { PROCESSING_METHODS, ROAST_LEVELS } from "@/lib/terms";
+import { requireUserId, UnauthorizedError } from "@/lib/auth-helpers";
 
 export async function GET(request: NextRequest) {
   try {
@@ -20,13 +21,14 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const userId = await requireUserId();
     const body = await request.json().catch(() => null);
     if (!body) {
       return NextResponse.json({ error: "请求格式错误" }, { status: 400 });
     }
-    if (!body.name || !body.origin_country || !body.created_by) {
+    if (!body.name || !body.origin_country) {
       return NextResponse.json(
-        { error: "豆名、产地国家和记录人为必填项" },
+        { error: "豆名和产地国家为必填项" },
         { status: 400 }
       );
     }
@@ -41,9 +43,12 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    const bean = await createBean(body);
+    const bean = await createBean({ ...body, user_id: userId });
     return NextResponse.json({ data: bean }, { status: 201 });
   } catch (err) {
+    if (err instanceof UnauthorizedError) {
+      return NextResponse.json({ error: "未登录" }, { status: 401 });
+    }
     console.error("POST /api/beans failed:", err);
     return NextResponse.json({ error: "创建咖啡豆失败" }, { status: 500 });
   }

@@ -34,12 +34,12 @@ export interface NewPhotoInput {
   storage_key: string;
   content_type: string;
   caption?: string | null;
-  created_by: string;
+  user_id: number;
 }
 
 export async function createPhoto(input: NewPhotoInput): Promise<Photo> {
   const rs = await db.execute({
-    sql: `INSERT INTO photos (entity_type, entity_id, storage_key, content_type, caption, created_by)
+    sql: `INSERT INTO photos (entity_type, entity_id, storage_key, content_type, caption, user_id)
           VALUES (?, ?, ?, ?, ?, ?)`,
     args: [
       input.entity_type,
@@ -47,7 +47,7 @@ export async function createPhoto(input: NewPhotoInput): Promise<Photo> {
       input.storage_key,
       input.content_type,
       input.caption ?? null,
-      input.created_by,
+      input.user_id,
     ],
   });
   const photo = await getPhoto(insertedId(rs));

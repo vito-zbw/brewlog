@@ -54,7 +54,7 @@ export async function getBeanWithVisits(
 export async function createBean(input: NewBeanInput): Promise<Bean> {
   const rs = await db.execute({
     sql: `INSERT INTO beans (name, origin_country, origin_region, farm, roaster,
-            processing_method, roast_level, tasting_notes_tags, tasting_notes_freetext, created_by)
+            processing_method, roast_level, tasting_notes_tags, tasting_notes_freetext, user_id)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       input.name,
@@ -66,7 +66,7 @@ export async function createBean(input: NewBeanInput): Promise<Bean> {
       input.roast_level ?? "Medium",
       input.tasting_notes_tags ?? null,
       input.tasting_notes_freetext ?? null,
-      input.created_by,
+      input.user_id,
     ],
   });
   const bean = await getBean(insertedId(rs));

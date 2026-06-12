@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createPhoto, entityExists } from "@/lib/queries";
 import { isSupportedImageType, savePhoto } from "@/lib/storage";
+import { requireUserId, UnauthorizedError } from "@/lib/auth-helpers";
 import type { PhotoEntityType } from "@/types";
 
 const MAX_BYTES = 4 * 1024 * 1024; // client downscales first; Vercel caps bodies at ~4.5MB
@@ -8,6 +9,7 @@ const ENTITY_TYPES: PhotoEntityType[] = ["bean", "cafe", "visit"];
 
 export async function POST(request: NextRequest) {
   try {
+    const userId = await requireUserId();
     const form = await request.formData().catch(() => null);
     if (!form) {
       return NextResponse.json({ error: "请求格式错误" }, { status: 400 });
@@ -16,14 +18,10 @@ export async function POST(request: NextRequest) {
     const file = form.get("file");
     const entityType = form.get("entity_type");
     const entityId = Number(form.get("entity_id"));
-    const createdBy = form.get("created_by");
     const caption = form.get("caption");
 
-    if (!(file instanceof File) || typeof createdBy !== "string" || !createdBy) {
-      return NextResponse.json(
-        { error: "照片和记录人为必填项" },
-        { status: 400 }
-      );
+    if (!(file instanceof File)) {
+      return NextResponse.json({ error: "照片为必填项" }, { status: 400 });
     }
     if (
       typeof entityType !== "string" ||
@@ -61,10 +59,13 @@ export async function POST(request: NextRequest) {
       storage_key: key,
       content_type: file.type,
       caption: typeof caption === "string" && caption ? caption : null,
-      created_by: createdBy,
+      user_id: userId,
     });
     return NextResponse.json({ data: photo }, { status: 201 });
   } catch (err) {
+    if (err instanceof UnauthorizedError) {
+      return NextResponse.json({ error: "未登录" }, { status: 401 });
+    }
     console.error("POST /api/photos failed:", err);
     return NextResponse.json({ error: "上传照片失败" }, { status: 500 });
   }

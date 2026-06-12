@@ -89,9 +89,9 @@ original language. The database stores canonical English values for closed lists
 
 - **Phase 1** ✅ — Private coffee journal (MVP): bean library, café map, visit logging, visit history
 - **Phase 2** ✅ — Photos and polish: image uploads (Cloudflare R2 with local-disk dev fallback), dashboard with personal stats, map filters (city / rating / brew method), café + visit detail pages
-- **Phase 3** — Multi-user: authentication (Auth.js), user profiles, custom domain
+- **Phase 3** ✅ — Multi-user: Auth.js login (Google + GitHub, one-click dev login locally), `user_id` data model with migration script, user profile pages, custom-domain guide
 - **Phase 4** — Social and discovery: follow system, activity feed, public pages, shareable links
 
 ## Current Status
 
-**Phase 2 complete** — private use for 3 users (name dropdown, no authentication, no public access). Photos upload to Cloudflare R2 in production ([`docs/setup/r2-setup.md`](docs/setup/r2-setup.md)) or local disk in development.
+**Phase 3 complete** — login required (Google/GitHub in production via [`docs/setup/oauth-setup.md`](docs/setup/oauth-setup.md); one-click dev login locally with `AUTH_DEV_LOGIN=true`). Visits, beans, cafés, and photos belong to real user accounts; profile pages at `/users/[id]`. Databases created before Phase 3 upgrade with `npm run migrate:phase3` (edit `scripts/user-mapping.json` first).

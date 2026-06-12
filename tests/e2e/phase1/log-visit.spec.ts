@@ -15,7 +15,7 @@ interface ApiCafe {
   country: string;
   latitude: number;
   longitude: number;
-  created_by: string;
+  user_id: number;
 }
 
 test.describe("log a visit", () => {
@@ -31,7 +31,7 @@ test.describe("log a visit", () => {
     // Wait for the beans/cafés fetch to land before interacting.
     await expect(page.getByTestId("log-bean-chip").first()).toBeVisible();
 
-    await page.getByTestId("log-user-select").selectOption("Baiwei");
+    // No name select since Phase 3 — identity comes from the session (Baiwei).
 
     // Inline café creation.
     await page.getByTestId("log-cafe-new-toggle").click();
@@ -103,7 +103,8 @@ test.describe("log a visit", () => {
     expect(created?.country).toBe("中国");
     expect(created?.latitude).toBeCloseTo(23.1, 5);
     expect(created?.longitude).toBeCloseTo(113.3, 5);
-    expect(created?.created_by).toBe("Baiwei");
+    // Attribution comes from the session: the request fixture is Baiwei (id 1).
+    expect(created?.user_id).toBe(1);
   });
 });
 

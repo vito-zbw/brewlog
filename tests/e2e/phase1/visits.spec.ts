@@ -5,7 +5,8 @@ interface ApiVisit {
   id: number;
   visit_date: string;
   cafe_name: string;
-  visited_by: string;
+  user_id: number;
+  user_name: string;
 }
 
 interface ApiCafe {
@@ -66,7 +67,8 @@ test.describe("探店记录 /visits", () => {
 
   test("person filter shows only Friend2's visits", async ({ page }) => {
     await page.goto("/visits");
-    await page.getByTestId("visit-filter-person").selectOption("Friend2");
+    // Since Phase 3 the filter options carry user ids; Friend2 is seed user 3.
+    await page.getByTestId("visit-filter-person").selectOption("3");
 
     const cards = page.getByTestId("visit-card");
     await expect(cards.first()).toContainText("Friend2 记录");

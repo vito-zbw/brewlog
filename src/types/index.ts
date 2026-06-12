@@ -1,3 +1,11 @@
+export interface User {
+  id: number;
+  email: string;
+  name: string;
+  image: string | null;
+  created_at: string;
+}
+
 export interface Bean {
   id: number;
   name: string;
@@ -9,7 +17,7 @@ export interface Bean {
   roast_level: string;
   tasting_notes_tags: string | null;
   tasting_notes_freetext: string | null;
-  created_by: string;
+  user_id: number;
   created_at: string;
 }
 
@@ -21,14 +29,14 @@ export interface Cafe {
   latitude: number;
   longitude: number;
   website: string | null;
-  created_by: string;
+  user_id: number;
   created_at: string;
 }
 
 export interface Visit {
   id: number;
   cafe_id: number;
-  visited_by: string;
+  user_id: number;
   visit_date: string;
   brew_method: string;
   rating_overall: number;
@@ -47,6 +55,7 @@ export interface VisitBean {
 export interface VisitWithDetails extends Visit {
   cafe_name: string;
   cafe_city: string;
+  user_name: string;
   beans: Bean[];
 }
 
@@ -70,7 +79,7 @@ export interface Photo {
   storage_key: string;
   content_type: string;
   caption: string | null;
-  created_by: string;
+  user_id: number;
   created_at: string;
   /** Public URL computed from storage_key by the query layer. */
   url: string;
@@ -105,7 +114,7 @@ export interface NewBeanInput {
   roast_level?: string;
   tasting_notes_tags?: string | null;
   tasting_notes_freetext?: string | null;
-  created_by: string;
+  user_id: number;
 }
 
 export interface NewCafeInput {
@@ -115,12 +124,12 @@ export interface NewCafeInput {
   latitude: number;
   longitude: number;
   website?: string | null;
-  created_by: string;
+  user_id: number;
 }
 
 export interface NewVisitInput {
   cafe_id: number;
-  visited_by: string;
+  user_id: number;
   visit_date: string;
   brew_method: string;
   rating_overall: number;

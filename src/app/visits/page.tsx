@@ -3,14 +3,19 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { VisitWithDetails, Cafe, Bean as BeanType } from "@/types";
-import { TEAM_MEMBERS } from "@/lib/terms";
 import { VisitCard } from "@/components/VisitCard";
+
+interface UserOption {
+  id: number;
+  name: string;
+}
 
 function VisitsContent() {
   const searchParams = useSearchParams();
   const [visits, setVisits] = useState<VisitWithDetails[]>([]);
   const [cafes, setCafes] = useState<Cafe[]>([]);
   const [beans, setBeans] = useState<BeanType[]>([]);
+  const [users, setUsers] = useState<UserOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -21,17 +26,20 @@ function VisitsContent() {
   useEffect(() => {
     async function loadFilters() {
       try {
-        const [cafesRes, beansRes] = await Promise.all([
+        const [cafesRes, beansRes, usersRes] = await Promise.all([
           fetch("/api/cafes"),
           fetch("/api/beans"),
+          fetch("/api/users"),
         ]);
-        if (!cafesRes.ok || !beansRes.ok) {
+        if (!cafesRes.ok || !beansRes.ok || !usersRes.ok) {
           throw new Error("请求失败");
         }
         const cafesJson: { data?: Cafe[]; error?: string } = await cafesRes.json();
         const beansJson: { data?: BeanType[]; error?: string } = await beansRes.json();
+        const usersJson: { data?: UserOption[]; error?: string } = await usersRes.json();
         setCafes(cafesJson.data ?? []);
         setBeans(beansJson.data ?? []);
+        setUsers(usersJson.data ?? []);
       } catch {
         // 筛选项加载失败时保留默认的"所有…"选项，不影响页面
       }
@@ -45,7 +53,7 @@ function VisitsContent() {
       setError(null);
       const params = new URLSearchParams();
       if (cafeFilter) params.set("cafe_id", cafeFilter);
-      if (personFilter) params.set("visited_by", personFilter);
+      if (personFilter) params.set("user_id", personFilter);
       if (beanFilter) params.set("bean_id", beanFilter);
 
       try {
@@ -80,9 +88,9 @@ function VisitsContent() {
             className="px-4 py-2 border border-cream-dark rounded-lg bg-cream/50 focus:outline-none focus:ring-2 focus:ring-terracotta/30 text-sm"
           >
             <option value="">所有人</option>
-            {TEAM_MEMBERS.map((m) => (
-              <option key={m} value={m}>
-                {m}
+            {users.map((u) => (
+              <option key={u.id} value={String(u.id)}>
+                {u.name}
               </option>
             ))}
           </select>

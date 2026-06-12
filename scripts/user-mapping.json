@@ -1,0 +1,6 @@
+{
+  "_comment": "Maps Phase 1-2 text names to user accounts for scripts/migrate-phase3.mjs. Edit the emails to each person's REAL OAuth email (Google/GitHub) BEFORE running the migration — email is how sign-ins link to these accounts.",
+  "Baiwei": { "email": "baiwei@example.com", "name": "Baiwei" },
+  "Friend1": { "email": "friend1@example.com", "name": "Friend1" },
+  "Friend2": { "email": "friend2@example.com", "name": "Friend2" }
+}

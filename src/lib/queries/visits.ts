@@ -4,7 +4,7 @@ import { mapRows, firstRow } from "./util";
 
 export interface VisitFilters {
   cafeId?: number;
-  visitedBy?: string;
+  userId?: number;
   beanId?: number;
   limit?: number;
 }
@@ -12,6 +12,11 @@ export interface VisitFilters {
 interface VisitBeanRow extends Bean {
   visit_id: number;
 }
+
+const VISIT_SELECT = `SELECT v.*, c.name AS cafe_name, c.city AS cafe_city, u.name AS user_name
+                      FROM visits v
+                      JOIN cafes c ON c.id = v.cafe_id
+                      JOIN users u ON u.id = v.user_id`;
 
 async function attachBeans(
   visits: Omit<VisitWithDetails, "beans">[]
@@ -39,19 +44,16 @@ async function attachBeans(
 export async function getVisitsWithBeans(
   filters: VisitFilters = {}
 ): Promise<VisitWithDetails[]> {
-  let sql = `SELECT v.*, c.name AS cafe_name, c.city AS cafe_city
-             FROM visits v
-             JOIN cafes c ON c.id = v.cafe_id
-             WHERE 1=1`;
+  let sql = `${VISIT_SELECT} WHERE 1=1`;
   const args: (string | number)[] = [];
 
   if (filters.cafeId) {
     sql += " AND v.cafe_id = ?";
     args.push(filters.cafeId);
   }
-  if (filters.visitedBy) {
-    sql += " AND v.visited_by = ?";
-    args.push(filters.visitedBy);
+  if (filters.userId) {
+    sql += " AND v.user_id = ?";
+    args.push(filters.userId);
   }
   if (filters.beanId) {
     sql += " AND v.id IN (SELECT visit_id FROM visit_beans WHERE bean_id = ?)";
@@ -73,12 +75,7 @@ export async function getVisitWithBeans(
   id: number
 ): Promise<VisitWithDetails | null> {
   const visit = firstRow<Omit<VisitWithDetails, "beans">>(
-    await db.execute({
-      sql: `SELECT v.*, c.name AS cafe_name, c.city AS cafe_city
-            FROM visits v JOIN cafes c ON c.id = v.cafe_id
-            WHERE v.id = ?`,
-      args: [id],
-    })
+    await db.execute({ sql: `${VISIT_SELECT} WHERE v.id = ?`, args: [id] })
   );
   if (!visit) return null;
   const [withBeans] = await attachBeans([visit]);
@@ -92,12 +89,12 @@ export async function createVisit(
   let visitId: number;
   try {
     const rs = await tx.execute({
-      sql: `INSERT INTO visits (cafe_id, visited_by, visit_date, brew_method,
+      sql: `INSERT INTO visits (cafe_id, user_id, visit_date, brew_method,
               rating_overall, rating_bean_quality, rating_barista_skill, rating_ambiance, notes)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
         input.cafe_id,
-        input.visited_by,
+        input.user_id,
         input.visit_date,
         input.brew_method,
         input.rating_overall,

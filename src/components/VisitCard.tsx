@@ -29,7 +29,9 @@ export function VisitCard({ visit }: VisitCardProps) {
         <div className="text-right">
           <RatingBeans rating={visit.rating_overall} />
           <p className="text-xs text-warm-gray mt-1">
-            {visit.visited_by} 记录
+            <Link href={`/users/${visit.user_id}`} className="hover:underline">
+              {visit.user_name} 记录
+            </Link>
           </p>
         </div>
       </div>

@@ -15,8 +15,8 @@ These docs cover the **interactive browser/account setups that cannot be automat
 | [`turso-setup.md`](./turso-setup.md) | Turso cloud database (production SQLite) | Before your first Vercel deploy | No |
 | [`vercel-deploy.md`](./vercel-deploy.md) | Vercel hosting + env vars | End of Phase 1; redeploy at the end of each phase | No |
 | [`r2-setup.md`](./r2-setup.md) | Cloudflare R2 photo storage | Phase 2 deploy | No |
-| `oauth-setup.md` — **not written yet, available in Phase 3** | Google + GitHub login (Auth.js) | Phase 3 | No |
-| `custom-domain.md` — **not written yet, available in Phase 3** | Custom domain + HTTPS on Vercel | Phase 3, optional | No |
+| [`oauth-setup.md`](./oauth-setup.md) | Google + GitHub login (Auth.js) | Phase 3 | No (dev login covers local) |
+| [`custom-domain.md`](./custom-domain.md) | Custom domain + HTTPS on Vercel | Phase 3, optional | No |
 
 ## Recommended Order 推荐顺序
 
@@ -45,3 +45,5 @@ All of these are documented with placeholders in the committed `.env.example`. L
 | `AUTH_GITHUB_ID` | `oauth-setup.md` (Phase 3) | Optional | Yes (Phase 3+) |
 | `AUTH_GITHUB_SECRET` | `oauth-setup.md` (Phase 3) | Optional | Yes (Phase 3+) |
 | `AUTH_DEV_LOGIN` | `oauth-setup.md` (Phase 3) | Yes — local only, enables one-click dev login | **NEVER. ⚠️ Setting `AUTH_DEV_LOGIN` on Vercel would let anyone log in without a password. Do not set it in any Vercel environment.** |
+| `AUTH_TRUST_HOST` | `oauth-setup.md` (Phase 3) | Yes — required for `next start` on localhost | No — Vercel is auto-trusted |
+| `AUTH_URL` | `custom-domain.md` (Phase 3, optional) | No | Only if login redirects misbehave on a custom domain |

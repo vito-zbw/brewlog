@@ -1,11 +1,10 @@
 import { test, expect } from "../../helpers/fixtures";
 
-// Friend2's seed data is untouched by every other spec (Phase 1 mutations run
-// as "Baiwei"), so personal stats can be asserted with EXACT equality:
-// 2 visits (.jpg coffee 广州 + %Arabica 深业上城店 深圳, both Espresso,
-// both rated 4), 2 distinct beans (Brazil Cerrado + Mandheling), 2 cafés.
-const FRIEND2 = "Friend2";
-
+// Friend2's seed data is untouched by every other spec (mutations run as the
+// default Baiwei session), so personal stats can be asserted with EXACT
+// equality: 2 visits (.jpg coffee 广州 + %Arabica 深业上城店 深圳, both
+// Espresso, both rated 4), 2 distinct beans (Brazil Cerrado + Mandheling),
+// 2 cafés, top origins Brazil & Indonesia (avg 4 each).
 interface StatsBody {
   data?: {
     total_beans_tried: number;
@@ -17,25 +16,27 @@ interface StatsBody {
   error?: string;
 }
 
-test.describe("phase2 dashboard — personal stats", () => {
-  test("personal stats for Friend2 match seed exactly", async ({ page }) => {
+test.describe("phase2 dashboard — Friend2 personal stats", () => {
+  // The dashboard scopes stats to the SESSION user (the user-select dropdown
+  // is gone), so these specs run with Friend2's saved session.
+  test.use({ storageState: "playwright/.auth/user2.json" });
+
+  test("shows the session user and their exact personal stats", async ({
+    page,
+  }) => {
     await page.goto("/");
 
-    await page.getByTestId("user-select").selectOption(FRIEND2);
+    await expect(page.getByTestId("dashboard-user")).toHaveText("Friend2");
 
-    // Personal stats load via a client-side fetch after selection — the
+    // Personal stats load via a client-side fetch of /api/stats — the
     // web-first toHaveText assertions wait for that round trip.
     await expect(page.getByTestId("stat-my-beans")).toHaveText("2");
     await expect(page.getByTestId("stat-my-cafes")).toHaveText("2");
     await expect(page.getByTestId("stat-my-visits")).toHaveText("2");
   });
 
-  test("top origins for Friend2 list Brazil and Indonesia", async ({
-    page,
-  }) => {
+  test("top origins list Brazil and Indonesia", async ({ page }) => {
     await page.goto("/");
-
-    await page.getByTestId("user-select").selectOption(FRIEND2);
 
     const topOrigins = page.getByTestId("top-origins");
     await expect(topOrigins).toBeVisible();
@@ -43,47 +44,35 @@ test.describe("phase2 dashboard — personal stats", () => {
     await expect(topOrigins).toContainText("Indonesia");
   });
 
-  test("brew breakdown for Friend2 shows bilingual Espresso label", async ({
-    page,
-  }) => {
+  test("brew breakdown shows bilingual Espresso label", async ({ page }) => {
     await page.goto("/");
-
-    await page.getByTestId("user-select").selectOption(FRIEND2);
 
     const breakdown = page.getByTestId("brew-breakdown");
     await expect(breakdown).toBeVisible();
     await expect(breakdown).toContainText("意式浓缩 Espresso");
   });
+});
 
-  test("user selection persists across reload via localStorage", async ({
-    page,
+test.describe("phase2 dashboard — /api/stats (session user)", () => {
+  test("GET /api/stats takes no param and returns the session user's stats", async ({
+    request,
   }) => {
-    await page.goto("/");
-
-    const userSelect = page.getByTestId("user-select");
-    await userSelect.selectOption(FRIEND2);
-    await expect(userSelect).toHaveValue(FRIEND2);
-
-    // Wait for the personal stats fetch so the selection has fully applied
-    // before the reload throws the page state away.
-    await expect(page.getByTestId("stat-my-visits")).toHaveText("2");
-
-    await page.reload();
-    await expect(page.getByTestId("user-select")).toHaveValue(FRIEND2);
+    // Default request fixture carries Baiwei's session cookie. Baiwei's
+    // counts drift as other specs create visits, so only the shape is exact.
+    const response = await request.get("/api/stats");
+    expect(response.status()).toBe(200);
+    const body = (await response.json()) as StatsBody;
+    expect(typeof body.data?.total_visits).toBe("number");
   });
+});
 
-  test("GET /api/stats validates the user param", async ({ page }) => {
-    const okResponse = await page.request.get(
-      `/api/stats?user=${encodeURIComponent(FRIEND2)}`
-    );
-    expect(okResponse.status()).toBe(200);
-    const okBody = (await okResponse.json()) as StatsBody;
-    expect(okBody.data?.total_visits).toBe(2);
+test.describe("phase2 dashboard — logged out", () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
 
-    const badResponse = await page.request.get("/api/stats?user=Nobody");
-    expect(badResponse.status()).toBe(400);
-    const badBody = (await badResponse.json()) as StatsBody;
-    expect(typeof badBody.error).toBe("string");
-    expect(badBody.error?.length).toBeGreaterThan(0);
+  test("GET /api/stats returns 401 without a session", async ({ request }) => {
+    const response = await request.get("/api/stats");
+    expect(response.status()).toBe(401);
+    const body = (await response.json()) as StatsBody;
+    expect(body.error).toBe("未登录");
   });
 });

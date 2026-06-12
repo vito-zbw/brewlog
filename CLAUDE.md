@@ -162,11 +162,20 @@ The database should be seeded by running `seed.sql` through the Turso CLI or a s
 ## Environment Variables
 
 ```
+# Database (local dev uses file:./data/brewlog.db — no cloud account needed)
 TURSO_DATABASE_URL=libsql://your-db-name-your-org.turso.io
 TURSO_AUTH_TOKEN=your-auth-token
+
+# Photos (Phase 2+; all five required to activate R2, otherwise local-disk fallback)
+R2_ACCOUNT_ID= / R2_ACCESS_KEY_ID= / R2_SECRET_ACCESS_KEY= / R2_BUCKET_NAME= / R2_PUBLIC_URL=
+
+# Auth (Phase 3+; AUTH_SECRET is required everywhere)
+AUTH_SECRET= / AUTH_GOOGLE_ID= / AUTH_GOOGLE_SECRET= / AUTH_GITHUB_ID= / AUTH_GITHUB_SECRET=
+AUTH_DEV_LOGIN=true   # local one-click login — NEVER set on Vercel
+AUTH_TRUST_HOST=true  # local `next start` only — not needed on Vercel
 ```
 
-These are obtained from the Turso dashboard after creating a database. Never commit `.env.local` to git.
+The full reference with placeholders lives in the committed `.env.example`; setup walkthroughs are in `docs/setup/`. Never commit `.env.local` to git.
 
 ## Coding Conventions
 
@@ -276,4 +285,4 @@ This file replaced the original MVP-only instructions, archived at `CLAUDE.legac
 - **Map**: default center Singapore → Guangzhou; pin colors by *average* rating (green ≥4 / amber 3–3.9 / red <3) → by *highest* overall visit rating (green ≥4 / yellow 3 / red ≤2)
 - **Routes**: map page `/map` → `/cafes`; log-a-visit form `/visits/new` → `/log`; new endpoint `GET /api/beans/[id]`
 
-**Important — codebase lags this spec.** The existing code was built against the legacy instructions: it uses `better-sqlite3` with auto-init/auto-seed (`src/lib/db.ts`), schema and seed under `data/`, English UI, Singapore map center (`src/components/CafeMapInner.tsx`), and the `/map` and `/visits/new` routes. When working in those areas, migrate toward this spec rather than treating the existing code as correct.
+**Resolved as of Phases 1–3 (2026-06).** The legacy-spec drift this note originally described (better-sqlite3 with auto-seed, English UI, Singapore map center, `/map` and `/visits/new` routes) was fully migrated in Phase 1 (`git tag phase-1`); Phases 2–3 then added photos/dashboard/map filters and Auth.js multi-user with `user_id` foreign keys. The codebase now matches this spec through Phase 3 — treat the code as correct.
