@@ -177,6 +177,21 @@ AUTH_TRUST_HOST=true  # local `next start` only — not needed on Vercel
 
 The full reference with placeholders lives in the committed `.env.example`; setup walkthroughs are in `docs/setup/`. Never commit `.env.local` to git.
 
+## Deployment & Release Rules
+
+- Production runs on Vercel via the GitHub integration: **pushing to `main` auto-deploys**. The normal release action is `git push origin main` — only use `vercel deploy --prod` as a fallback.
+- **Migrate the production database BEFORE pushing code that depends on a schema change.** Migration scripts live in `scripts/migrate-*.mjs` and must be idempotent (safe to re-run) and atomic (a failure leaves the database unchanged). Run them against production like this:
+
+  ```bash
+  TURSO_AUTH_TOKEN="$(turso db tokens create brewlog)" \
+    npm run migrate:phase4 -- "$(turso db show brewlog --url)"
+  ```
+
+  Order matters: migrate first, push second — the old code tolerates extra tables/columns, but new code 500s on missing ones.
+- Never run migrations or seeding from app code at startup (same principle as the no-auto-seed rule).
+- Push only when `npm run verify` is fully green (typecheck → lint → build → complete Playwright suite).
+- Secrets live only in `.env.local` (gitignored) and Vercel env vars. `AUTH_DEV_LOGIN` must never be set on Vercel — it would allow passwordless login as any user.
+
 ## Coding Conventions
 
 ### General
