@@ -105,6 +105,14 @@ CLI equivalent: `vercel env add <NAME> production`.
 
 **⚠️ Env var changes do NOT apply to the existing deployment.** After any change, redeploy: dashboard → **Deployments** → latest → **⋯** → **Redeploy**, or run `vercel deploy --prod`, or push any commit.
 
+**Phase upgrades 数据库升级:** when redeploying a NEW phase over an existing cloud database, run the additive migration first. For Phase 4 (creates the `follows` / `crawls` / `crawl_visits` tables):
+
+```bash
+TURSO_AUTH_TOKEN="$(turso db tokens create brewlog)" npm run migrate:phase4 -- "$(turso db show brewlog --url)"
+```
+
+It is idempotent — safe to re-run. Without it, `/crawls`, `/feed`, profile pages and follows will 500 on a Phase 3 database.
+
 All env vars BrewLog will ever need (also documented in the committed `.env.example`):
 
 | Variable | Phase | Set on Vercel? |
@@ -134,13 +142,21 @@ All env vars BrewLog will ever need (also documented in the committed `.env.exam
 
 ## Verify 验证
 
-Since Phase 3, the deployed app requires login — anonymous requests being turned away **is the success signal**:
+Since Phase 4, the site is **public-read**: anonymous visitors can browse every page and GET endpoint; login is only required for posting (logging visits, crawls, follows, photos) and personal data.
 
-1. Open `https://<project>.vercel.app/beans` in a browser — you should be **redirected to the login page** (登录 BrewLog). That means the app booted, the database is reachable, and route protection works. (The login page shows Google/GitHub buttons only after `docs/setup/oauth-setup.md`; before that it may say 暂无可用的登录方式 — still a successful deploy.)
+1. Open `https://<project>.vercel.app/beans` in a browser **without logging in** — the bean library (咖啡豆库) loads with the **8 seed beans** and a Chinese UI. That means the app booted and the database is reachable. Also spot-check `/cafes` (7 cafés on a Guangzhou-centered map) and `/visits` (9 visits) — all public.
 2. From the terminal (replace with your URL):
 
 ```bash
-curl -s -w " [%{http_code}]" https://<project>.vercel.app/api/beans
+curl -s https://<project>.vercel.app/api/beans
+```
+
+Expected: a JSON body starting with `{"data":` — public GET endpoints serve anonymous callers. A `500`, HTML error page, or connection failure means something is wrong → Troubleshooting.
+3. **Protection check:** open `https://<project>.vercel.app/log` — you should be **redirected to the login page** (登录 BrewLog). Write actions stay behind login. (The login page shows Google/GitHub buttons only after `docs/setup/oauth-setup.md`; before that it may say 暂无可用的登录方式 — still a successful deploy.)
+4. Personal data stays protected:
+
+```bash
+curl -s -w " [%{http_code}]" https://<project>.vercel.app/api/stats
 ```
 
 Expected output:
@@ -149,8 +165,7 @@ Expected output:
 {"error":"未登录"} [401]
 ```
 
-That 401 is correct — the API rejects anonymous callers. A `500`, HTML error page, or connection failure means something is wrong → Troubleshooting.
-3. Full end-to-end check (seed beans, map, visits) is only possible after real login — complete `docs/setup/oauth-setup.md`, sign in on the deployed site, then check `/beans` (8 seed beans), `/cafes` (7 cafés on a Guangzhou-centered map), and `/visits` (9 visits).
+5. Full write-path check (logging a visit, following, crawls) requires real login — complete `docs/setup/oauth-setup.md`, sign in on the deployed site, then log a test visit via `/log`.
 
 ## Troubleshooting 排错
 

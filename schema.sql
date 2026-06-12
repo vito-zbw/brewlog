@@ -2,7 +2,8 @@
 -- Single source of truth for the data model.
 -- Apply with `npm run db:init` (local) or `turso db shell brewlog < schema.sql` (cloud).
 -- Fresh installs get this final shape directly; databases created before
--- Phase 3 are upgraded with scripts/migrate-phase3.mjs.
+-- Phase 3 are upgraded with scripts/migrate-phase3.mjs, and the Phase 4
+-- tables (follows, crawls, crawl_visits) with scripts/migrate-phase4.mjs.
 --
 -- Enum-like columns (processing_method, roast_level, brew_method) store canonical
 -- English values; the bilingual "中文 English" display labels live in src/lib/terms.ts.
@@ -74,6 +75,30 @@ CREATE TABLE IF NOT EXISTS photos (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS follows (
+    follower_id INTEGER NOT NULL REFERENCES users(id),
+    following_id INTEGER NOT NULL REFERENCES users(id),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (follower_id, following_id),
+    CHECK (follower_id <> following_id)
+);
+
+CREATE TABLE IF NOT EXISTS crawls (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    title TEXT NOT NULL,                         -- e.g. "东山口咖啡半日游"
+    description TEXT,
+    crawl_date DATE NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS crawl_visits (
+    crawl_id INTEGER NOT NULL REFERENCES crawls(id) ON DELETE CASCADE,
+    visit_id INTEGER NOT NULL REFERENCES visits(id),
+    stop_order INTEGER NOT NULL,                 -- 1-based position within the crawl
+    PRIMARY KEY (crawl_id, visit_id)
+);
+
 -- Indexes for common query patterns
 CREATE INDEX IF NOT EXISTS idx_beans_origin ON beans(origin_country);
 CREATE INDEX IF NOT EXISTS idx_beans_roaster ON beans(roaster);
@@ -82,3 +107,5 @@ CREATE INDEX IF NOT EXISTS idx_visits_cafe ON visits(cafe_id);
 CREATE INDEX IF NOT EXISTS idx_visits_date ON visits(visit_date DESC);
 CREATE INDEX IF NOT EXISTS idx_visits_user ON visits(user_id);
 CREATE INDEX IF NOT EXISTS idx_photos_entity ON photos(entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_follows_following ON follows(following_id);
+CREATE INDEX IF NOT EXISTS idx_crawls_user ON crawls(user_id);

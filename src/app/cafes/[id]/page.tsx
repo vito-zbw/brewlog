@@ -1,9 +1,16 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { getCafe, getVisitsWithBeans, listPhotos } from "@/lib/queries";
+import { auth } from "@/auth";
+import {
+  getCafe,
+  getCafeCommunityStats,
+  getVisitsWithBeans,
+  listPhotos,
+} from "@/lib/queries";
 import { formatVisitDate } from "@/lib/terms";
 import { PhotoGallery } from "@/components/PhotoGallery";
 import { PhotoUpload } from "@/components/PhotoUpload";
+import { ShareLinkButton } from "@/components/ShareLinkButton";
 import { VisitCard } from "@/components/VisitCard";
 
 export const dynamic = "force-dynamic";
@@ -24,13 +31,23 @@ export default async function CafeDetailPage({
     notFound();
   }
 
-  const visits = await getVisitsWithBeans({ cafeId });
-  const photos = await listPhotos("cafe", cafeId);
+  const [visits, photos, stats, session] = await Promise.all([
+    getVisitsWithBeans({ cafeId }),
+    listPhotos("cafe", cafeId),
+    getCafeCommunityStats(cafeId),
+    auth(),
+  ]);
+  const loggedIn = typeof session?.user?.id === "number";
 
-  const maxRating =
-    visits.length > 0 ? Math.max(...visits.map((v) => v.rating_overall)) : null;
   // getVisitsWithBeans orders by visit_date DESC, so visits[0] is the newest.
   const lastVisitDate = visits.length > 0 ? visits[0].visit_date : null;
+
+  const ratingItems = [
+    { label: "总体", value: stats.avg_overall },
+    { label: "豆子", value: stats.avg_bean_quality },
+    { label: "咖啡师", value: stats.avg_barista_skill },
+    { label: "环境", value: stats.avg_ambiance },
+  ];
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -45,9 +62,12 @@ export default async function CafeDetailPage({
         data-testid="cafe-detail"
         className="bg-white rounded-xl shadow-sm border border-cream-dark/50 p-8 mb-8"
       >
-        <h1 className="text-3xl font-bold font-[Playfair_Display] text-espresso mb-2">
-          {cafe.name}
-        </h1>
+        <div className="flex items-start justify-between gap-4 mb-2">
+          <h1 className="text-3xl font-bold font-[Playfair_Display] text-espresso">
+            {cafe.name}
+          </h1>
+          <ShareLinkButton />
+        </div>
         <p className="text-warm-gray text-lg mb-2">
           {cafe.city}, {cafe.country}
         </p>
@@ -62,30 +82,26 @@ export default async function CafeDetailPage({
           </a>
         )}
 
-        {visits.length > 0 && (
-          <div className="grid grid-cols-3 gap-4 mt-4">
-            <div>
-              <p className="text-xs text-warm-gray/70 uppercase tracking-wider">
-                最高评分
-              </p>
-              <p className="text-sm font-medium text-espresso">{maxRating}/5</p>
+        {stats.visit_count > 0 && (
+          <div data-testid="cafe-community-stats" className="mt-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {ratingItems.map(({ label, value }) => (
+                <div key={label}>
+                  <p className="text-xs text-warm-gray/70 uppercase tracking-wider">
+                    {label}
+                  </p>
+                  <p className="text-sm font-medium text-espresso">
+                    ☕ {value} 分
+                  </p>
+                </div>
+              ))}
             </div>
-            <div>
-              <p className="text-xs text-warm-gray/70 uppercase tracking-wider">
-                探店次数
-              </p>
-              <p className="text-sm font-medium text-espresso">
-                {visits.length}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-warm-gray/70 uppercase tracking-wider">
-                最近到访
-              </p>
-              <p className="text-sm font-medium text-espresso">
-                {lastVisitDate ? formatVisitDate(lastVisitDate) : ""}
-              </p>
-            </div>
+            <p className="text-sm text-warm-gray mt-3">
+              {stats.visit_count} 次探店
+              {lastVisitDate && (
+                <> · 最近到访 {formatVisitDate(lastVisitDate)}</>
+              )}
+            </p>
           </div>
         )}
       </div>
@@ -94,8 +110,8 @@ export default async function CafeDetailPage({
         照片
       </h2>
       <div className="mb-8 space-y-4">
-        <PhotoUpload entityType="cafe" entityId={cafeId} />
-        <PhotoGallery photos={photos} />
+        {loggedIn && <PhotoUpload entityType="cafe" entityId={cafeId} />}
+        <PhotoGallery photos={photos} canDelete={loggedIn} />
       </div>
 
       <h2 className="text-2xl font-bold font-[Playfair_Display] text-espresso mb-4">

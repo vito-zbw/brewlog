@@ -1,10 +1,12 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { auth } from "@/auth";
 import { getVisitWithBeans, listPhotos } from "@/lib/queries";
 import { BREW_METHODS, formatVisitDate, optionLabel } from "@/lib/terms";
 import { RatingBeans } from "@/components/RatingBeans";
 import { PhotoGallery } from "@/components/PhotoGallery";
 import { PhotoUpload } from "@/components/PhotoUpload";
+import { ShareLinkButton } from "@/components/ShareLinkButton";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +27,8 @@ export default async function VisitDetailPage({
   }
 
   const photos = await listPhotos("visit", visitId);
+  const session = await auth();
+  const loggedIn = typeof session?.user?.id === "number";
 
   const ratings = [
     { label: "总体评分", value: visit.rating_overall },
@@ -64,10 +68,11 @@ export default async function VisitDetailPage({
           </Link>
         </p>
 
-        <div className="mb-6">
+        <div className="mb-6 flex items-center justify-between gap-2">
           <span className="text-xs px-2 py-0.5 rounded-full bg-espresso/10 text-espresso font-medium">
             {optionLabel(BREW_METHODS, visit.brew_method)}
           </span>
+          <ShareLinkButton />
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
@@ -123,8 +128,8 @@ export default async function VisitDetailPage({
         照片
       </h2>
       <div className="space-y-4">
-        <PhotoUpload entityType="visit" entityId={visitId} />
-        <PhotoGallery photos={photos} />
+        {loggedIn && <PhotoUpload entityType="visit" entityId={visitId} />}
+        <PhotoGallery photos={photos} canDelete={loggedIn} />
       </div>
     </div>
   );

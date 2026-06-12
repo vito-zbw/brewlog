@@ -112,7 +112,7 @@ Normally **skip this** — on Vercel, Auth.js auto-detects the request host, so 
 
 ## Verify — 验证
 
-1. Open `https://yourdomain.com` in a browser. You land on the BrewLog **login page** (logged-out visitors are always redirected there — that is correct) with a **padlock icon** (valid HTTPS) in the address bar and no certificate warning. If you are already signed in, the dashboard loads directly.
+1. Open `https://yourdomain.com` in a browser. The BrewLog **dashboard** loads — since Phase 4 the site is public-read, so anonymous visitors see the public dashboard with a 登录 login prompt section in place of personal stats (that is correct, not an error). Check the **padlock icon** (valid HTTPS) in the address bar with no certificate warning. If you are already signed in, your personal stats show instead.
 2. `https://www.yourdomain.com` redirects to the apex (or vice versa, whichever you picked in Step 2).
 3. **Full login round-trip on the domain:** click 登录 (sign in) → choose Google (and/or GitHub) → complete the provider's consent screen → you land back on `https://yourdomain.com` **logged in as your BrewLog user** (your name shows, your visits are yours). If you bounce to `.vercel.app` mid-flow or get an OAuth error, see Troubleshooting.
 4. Terminal spot-check:
@@ -121,7 +121,7 @@ Normally **skip this** — on Vercel, Auth.js auto-detects the request host, so 
 curl -sI https://yourdomain.com | head -n 1
 ```
 
-Expected: `HTTP/2 307` (the redirect to `/login` for an anonymous request — success) or `HTTP/2 200` if the URL already points at the login page; `307`/`308` also appears on the www-redirect variant. A `500` or certificate error means something is wrong.
+Expected: `HTTP/2 200` — the public dashboard is served to anonymous requests (no longer a `307` to `/login`). A `307`/`308` only appears on the www-redirect variant (whichever of `www`/apex you chose to redirect in Step 2). A `500` or certificate error means something is wrong.
 
 ## Troubleshooting — 排错
 

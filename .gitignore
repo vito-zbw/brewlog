@@ -25,7 +25,11 @@ next-env.d.ts
 # database & uploads (runtime artifacts)
 /data/
 
+# temp / credentials
+/temp/
+
 # playwright
 /playwright/.auth/
 /test-results/
 /playwright-report/
+.vercel

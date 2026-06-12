@@ -13,6 +13,7 @@
     "db:reset": "node --env-file-if-exists=.env.local scripts/init-db.mjs --reset --seed",
     "db:init:test": "node scripts/init-db.mjs file:./data/test.db --reset --seed",
     "migrate:phase3": "node --env-file-if-exists=.env.local scripts/migrate-phase3.mjs",
+    "migrate:phase4": "node --env-file-if-exists=.env.local scripts/migrate-phase4.mjs",
     "test:e2e": "npm run build && npm run db:init:test && playwright test",
     "verify": "npm run typecheck && npm run lint && npm run test:e2e"
   },

@@ -59,17 +59,22 @@ export default async function RootLayout({
       <body className="min-h-screen bg-cream">
         <nav className="bg-espresso text-cream shadow-lg">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex flex-wrap items-center justify-between gap-y-1 py-2 min-h-16 sm:h-16 sm:py-0">
-              <Link href="/" className="flex items-center gap-2">
+            <div className="flex items-center justify-between h-16">
+              <Link href="/" className="flex items-center gap-2 shrink-0">
                 <span className="text-2xl">&#9749;</span>
                 <span className="text-xl font-bold font-[Playfair_Display]">
                   BrewLog
                 </span>
               </Link>
-              <div className="flex flex-wrap items-center justify-end gap-x-1 gap-y-1">
+              <div className="flex flex-nowrap items-center gap-1 overflow-x-auto [scrollbar-width:none] [-webkit-overflow-scrolling:touch] min-w-0 flex-1 justify-end sm:flex-initial">
                 <NavLink href="/beans" testId="nav-beans">咖啡豆</NavLink>
                 <NavLink href="/cafes" testId="nav-cafes">咖啡馆</NavLink>
                 <NavLink href="/visits" testId="nav-visits">探店记录</NavLink>
+                <NavLink href="/crawls" testId="nav-crawls">咖啡之旅</NavLink>
+                <NavLink href="/leaderboard" testId="nav-leaderboard">排行榜</NavLink>
+                {user && (
+                  <NavLink href="/feed" testId="nav-feed">动态</NavLink>
+                )}
                 <Link
                   href="/log"
                   data-testid="nav-log"

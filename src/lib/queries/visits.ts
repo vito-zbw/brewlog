@@ -82,6 +82,38 @@ export async function getVisitWithBeans(
   return withBeans;
 }
 
+/** Visits from users the given user follows, most recently logged first. */
+export async function getFeedVisits(
+  userId: number,
+  limit = 50
+): Promise<VisitWithDetails[]> {
+  const visits = mapRows<Omit<VisitWithDetails, "beans">>(
+    await db.execute({
+      sql: `${VISIT_SELECT}
+            WHERE v.user_id IN (SELECT following_id FROM follows WHERE follower_id = ?)
+            ORDER BY v.created_at DESC, v.visit_date DESC
+            LIMIT ?`,
+      args: [userId, limit],
+    })
+  );
+  return attachBeans(visits);
+}
+
+/** Specific visits by id (crawl stops). */
+export async function getVisitsByIds(
+  ids: number[]
+): Promise<VisitWithDetails[]> {
+  if (ids.length === 0) return [];
+  const placeholders = ids.map(() => "?").join(",");
+  const visits = mapRows<Omit<VisitWithDetails, "beans">>(
+    await db.execute({
+      sql: `${VISIT_SELECT} WHERE v.id IN (${placeholders})`,
+      args: ids,
+    })
+  );
+  return attachBeans(visits);
+}
+
 export async function createVisit(
   input: NewVisitInput
 ): Promise<VisitWithDetails> {

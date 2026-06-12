@@ -49,7 +49,7 @@ test.describe("登录页 /login（未登录）", () => {
 
 test.describe("退出登录", () => {
   // Default storage state: logged in as Baiwei.
-  test("logout returns to /login and protected pages stay locked", async ({
+  test("logout returns to /login; / is public, /log stays locked", async ({
     page,
   }) => {
     await page.goto("/");
@@ -62,8 +62,15 @@ test.describe("退出登录", () => {
     await expect(page.getByTestId("nav-login")).toBeVisible();
     await expect(page.getByTestId("nav-profile")).toHaveCount(0);
 
-    // The session cookie is gone — protected pages bounce back to /login.
+    // Phase 4: the dashboard is public-read. Logged out, / loads but shows
+    // the login prompt instead of personal stats.
     await page.goto("/");
+    await expect(page).toHaveURL("/");
+    await expect(page.getByTestId("dashboard-login-prompt")).toBeVisible();
+    await expect(page.getByTestId("nav-login")).toBeVisible();
+
+    // Protected pages still bounce to /login.
+    await page.goto("/log");
     await expect(page).toHaveURL(/\/login/);
   });
 });

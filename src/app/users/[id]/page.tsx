@@ -1,13 +1,17 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { auth } from "@/auth";
 import {
   getUserById,
   getUserStats,
   getUserFavoriteBeans,
   getVisitsWithBeans,
+  getFollowCounts,
+  isFollowing,
 } from "@/lib/queries";
 import { formatVisitDate } from "@/lib/terms";
 import { VisitCard } from "@/components/VisitCard";
+import { FollowButton } from "@/components/FollowButton";
 
 export const dynamic = "force-dynamic";
 
@@ -27,11 +31,20 @@ export default async function UserProfilePage({
     notFound();
   }
 
-  const [stats, favoriteBeans, visits] = await Promise.all([
-    getUserStats(userId),
-    getUserFavoriteBeans(userId),
-    getVisitsWithBeans({ userId }),
-  ]);
+  const session = await auth();
+  const viewerId =
+    typeof session?.user?.id === "number" ? session.user.id : null;
+
+  const [stats, favoriteBeans, visits, followCounts, viewerFollows] =
+    await Promise.all([
+      getUserStats(userId),
+      getUserFavoriteBeans(userId),
+      getVisitsWithBeans({ userId }),
+      getFollowCounts(userId),
+      viewerId !== null && viewerId !== userId
+        ? isFollowing(viewerId, userId)
+        : Promise.resolve(false),
+    ]);
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -51,14 +64,22 @@ export default async function UserProfilePage({
             {user.name.charAt(0).toUpperCase()}
           </div>
         )}
-        <div>
+        <div className="flex-1">
           <h1 className="text-2xl font-bold font-[Playfair_Display] text-espresso">
             {user.name}
           </h1>
           <p className="text-warm-gray text-sm mt-1">
             加入于 {formatVisitDate(user.created_at)}
           </p>
+          <p className="text-warm-gray text-sm mt-1">
+            <span data-testid="follow-counts">
+              {followCounts.following} 关注 · {followCounts.followers} 粉丝
+            </span>
+          </p>
         </div>
+        {viewerId !== null && viewerId !== userId && (
+          <FollowButton targetUserId={userId} initialFollowing={viewerFollows} />
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -150,7 +171,7 @@ export default async function UserProfilePage({
       </div>
 
       <h2 className="text-2xl font-bold font-[Playfair_Display] text-espresso mb-4">
-        TA 的探店记录（{visits.length}）
+        {viewerId === userId ? "我的" : "TA 的"}探店记录（{visits.length}）
       </h2>
 
       {visits.length === 0 ? (

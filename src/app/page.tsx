@@ -73,17 +73,34 @@ export default async function Home() {
         </Link>
       </div>
 
-      <Dashboard userName={session?.user?.name ?? ""} />
+      <Dashboard
+        userName={
+          typeof session?.user?.id === "number"
+            ? (session.user.name ?? "")
+            : null
+        }
+      />
 
       <div>
         <h2 className="text-2xl font-bold font-[Playfair_Display] text-espresso mb-6">
           最新探店
         </h2>
-        <div className="space-y-4">
-          {recentVisits.map((visit) => (
-            <VisitCard key={visit.id} visit={visit} />
-          ))}
-        </div>
+        {recentVisits.length === 0 ? (
+          <div
+            data-testid="recent-empty"
+            className="bg-white rounded-xl shadow-sm border border-cream-dark/50 p-8 text-center"
+          >
+            <p className="text-warm-gray">
+              还没有探店记录，登录后从「记录探店」开始吧。
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {recentVisits.map((visit) => (
+              <VisitCard key={visit.id} visit={visit} />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

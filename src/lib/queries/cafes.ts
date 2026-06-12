@@ -1,5 +1,10 @@
 import { db } from "@/lib/db";
-import type { Cafe, CafeWithStats, NewCafeInput } from "@/types";
+import type {
+  Cafe,
+  CafeCommunityStats,
+  CafeWithStats,
+  NewCafeInput,
+} from "@/types";
 import { mapRows, firstRow, insertedId } from "./util";
 
 export async function listCafesWithStats(): Promise<CafeWithStats[]> {
@@ -21,6 +26,32 @@ export async function listCafesWithStats(): Promise<CafeWithStats[]> {
 export async function getCafe(id: number): Promise<Cafe | null> {
   return firstRow<Cafe>(
     await db.execute({ sql: "SELECT * FROM cafes WHERE id = ?", args: [id] })
+  );
+}
+
+/** Community averages across all visits to a café (public café page). */
+export async function getCafeCommunityStats(
+  cafeId: number
+): Promise<CafeCommunityStats> {
+  const row = firstRow<CafeCommunityStats>(
+    await db.execute({
+      sql: `SELECT COUNT(*) AS visit_count,
+                   ROUND(AVG(rating_overall), 1) AS avg_overall,
+                   ROUND(AVG(rating_bean_quality), 1) AS avg_bean_quality,
+                   ROUND(AVG(rating_barista_skill), 1) AS avg_barista_skill,
+                   ROUND(AVG(rating_ambiance), 1) AS avg_ambiance
+            FROM visits WHERE cafe_id = ?`,
+      args: [cafeId],
+    })
+  );
+  return (
+    row ?? {
+      visit_count: 0,
+      avg_overall: null,
+      avg_bean_quality: null,
+      avg_barista_skill: null,
+      avg_ambiance: null,
+    }
   );
 }
 

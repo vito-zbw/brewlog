@@ -41,6 +41,7 @@ export function MapFilters({
       <select
         value={city}
         onChange={(e) => onCityChange(e.target.value)}
+        aria-label="筛选城市"
         data-testid="map-filter-city"
         className={selectClass}
       >
@@ -54,6 +55,7 @@ export function MapFilters({
       <select
         value={minRating}
         onChange={(e) => onMinRatingChange(e.target.value)}
+        aria-label="筛选最低评分"
         data-testid="map-filter-rating"
         className={selectClass}
       >
@@ -67,6 +69,7 @@ export function MapFilters({
       <select
         value={brew}
         onChange={(e) => onBrewChange(e.target.value)}
+        aria-label="筛选冲煮方式"
         data-testid="map-filter-brew"
         className={selectClass}
       >

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import type { UserStats } from "@/types";
 import { BREW_METHODS, optionLabel } from "@/lib/terms";
 
@@ -9,12 +10,16 @@ interface StatsResponse {
   error?: string;
 }
 
-export function Dashboard({ userName }: { userName: string }) {
+// userName is null for anonymous visitors — the section then invites them to
+// log in instead of fetching the (session-only) stats API.
+export function Dashboard({ userName }: { userName: string | null }) {
+  const loggedIn = userName !== null;
   const [stats, setStats] = useState<UserStats | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(loggedIn);
   const [error, setError] = useState(false);
 
   useEffect(() => {
+    if (!loggedIn) return;
     const controller = new AbortController();
 
     async function load() {
@@ -42,7 +47,29 @@ export function Dashboard({ userName }: { userName: string }) {
 
     void load();
     return () => controller.abort();
-  }, []);
+  }, [loggedIn]);
+
+  if (!loggedIn) {
+    return (
+      <div className="mb-12">
+        <h2 className="text-2xl font-bold font-[Playfair_Display] text-espresso mb-6">
+          我的咖啡足迹
+        </h2>
+        <div
+          data-testid="dashboard-login-prompt"
+          className="bg-white rounded-xl shadow-sm border border-cream-dark/50 p-8 text-center"
+        >
+          <p className="text-warm-gray mb-4">登录后查看你的个人咖啡足迹。</p>
+          <Link
+            href="/login"
+            className="inline-block px-5 py-2.5 bg-terracotta hover:bg-terracotta-light text-cream rounded-xl text-sm font-medium transition-colors"
+          >
+            去登录
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   const maxCount =
     stats && stats.brew_breakdown.length > 0

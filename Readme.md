@@ -56,6 +56,8 @@ Claude Code session and say "help me complete this process".
 1. [`docs/setup/turso-setup.md`](docs/setup/turso-setup.md) — create the cloud database
 2. [`docs/setup/vercel-deploy.md`](docs/setup/vercel-deploy.md) — deploy to Vercel
 3. [`docs/setup/r2-setup.md`](docs/setup/r2-setup.md) — photo storage (required before uploading photos on the deployed site)
+4. [`docs/setup/oauth-setup.md`](docs/setup/oauth-setup.md) — real Google/GitHub login (required for posting on the deployed site)
+5. [`docs/setup/custom-domain.md`](docs/setup/custom-domain.md) — optional custom domain
 
 All env vars are documented in `.env.example`.
 
@@ -90,8 +92,8 @@ original language. The database stores canonical English values for closed lists
 - **Phase 1** ✅ — Private coffee journal (MVP): bean library, café map, visit logging, visit history
 - **Phase 2** ✅ — Photos and polish: image uploads (Cloudflare R2 with local-disk dev fallback), dashboard with personal stats, map filters (city / rating / brew method), café + visit detail pages
 - **Phase 3** ✅ — Multi-user: Auth.js login (Google + GitHub, one-click dev login locally), `user_id` data model with migration script, user profile pages, custom-domain guide
-- **Phase 4** — Social and discovery: follow system, activity feed, public pages, shareable links
+- **Phase 4** ✅ — Social and discovery: public-read site, follow system + activity feed (`/feed`), coffee crawls (`/crawls`), leaderboards (`/leaderboard`), shareable links, nearby-café search
 
 ## Current Status
 
-**Phase 3 complete** — login required (Google/GitHub in production via [`docs/setup/oauth-setup.md`](docs/setup/oauth-setup.md); one-click dev login locally with `AUTH_DEV_LOGIN=true`). Visits, beans, cafés, and photos belong to real user accounts; profile pages at `/users/[id]`. Databases created before Phase 3 upgrade with `npm run migrate:phase3` (edit `scripts/user-mapping.json` first).
+**Phase 4 complete — the site is public.** Anyone can browse beans, cafés, visits, profiles, crawls, and the leaderboard without an account; logging in (Google/GitHub in production, one-click dev login locally) unlocks the personal dashboard, visit logging, photo uploads, follows + the activity feed, and crawl authoring. Databases created before Phase 4 upgrade with `npm run migrate:phase4` (additive, idempotent). Production photo uploads still require the Cloudflare R2 setup ([`docs/setup/r2-setup.md`](docs/setup/r2-setup.md)).

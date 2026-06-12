@@ -104,6 +104,54 @@ export interface UserStats {
   brew_breakdown: BrewStat[];
 }
 
+export interface Crawl {
+  id: number;
+  user_id: number;
+  title: string;
+  description: string | null;
+  crawl_date: string;
+  created_at: string;
+}
+
+export interface CrawlSummary extends Crawl {
+  user_name: string;
+  stop_count: number;
+}
+
+export interface CrawlWithStops extends Crawl {
+  user_name: string;
+  /** The crawl's visits, in stop order. */
+  stops: VisitWithDetails[];
+}
+
+export interface NewCrawlInput {
+  user_id: number;
+  title: string;
+  description?: string | null;
+  crawl_date: string;
+  visit_ids: number[];
+}
+
+export interface FollowCounts {
+  followers: number;
+  following: number;
+}
+
+export interface LeaderboardEntry {
+  user_id: number;
+  user_name: string;
+  user_image: string | null;
+  value: number;
+}
+
+export interface CafeCommunityStats {
+  visit_count: number;
+  avg_overall: number | null;
+  avg_bean_quality: number | null;
+  avg_barista_skill: number | null;
+  avg_ambiance: number | null;
+}
+
 export interface NewBeanInput {
   name: string;
   origin_country: string;

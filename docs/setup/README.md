@@ -6,7 +6,7 @@ These docs cover the **interactive browser/account setups that cannot be automat
 
 **How to use 使用方法:** pick one doc, paste its entire contents into a new Claude Code session, and say **"help me complete this process"**. One doc per session.
 
-**Local development needs NONE of these 本地开发不需要任何云账号.** The app runs fully offline with `TURSO_DATABASE_URL=file:./data/brewlog.db` in `.env.local` (and, once Phase 3 lands, a one-click dev login via `AUTH_DEV_LOGIN`). Only set up cloud services when you are ready to deploy.
+**Local development needs NONE of these 本地开发不需要任何云账号.** The app runs fully offline with `TURSO_DATABASE_URL=file:./data/brewlog.db` in `.env.local` (and a one-click dev login via `AUTH_DEV_LOGIN`, since Phase 3). Only set up cloud services when you are ready to deploy.
 
 ## The Docs 文档列表
 
@@ -17,6 +17,8 @@ These docs cover the **interactive browser/account setups that cannot be automat
 | [`r2-setup.md`](./r2-setup.md) | Cloudflare R2 photo storage | Phase 2 deploy | No |
 | [`oauth-setup.md`](./oauth-setup.md) | Google + GitHub login (Auth.js) | Phase 3 | No (dev login covers local) |
 | [`custom-domain.md`](./custom-domain.md) | Custom domain + HTTPS on Vercel | Phase 3, optional | No |
+
+**Phase 4 第四阶段:** no new cloud services are needed. But when redeploying Phase 4 over an existing cloud database, run the `migrate:phase4` migration first — see the "Phase upgrades 数据库升级" note in [`vercel-deploy.md`](./vercel-deploy.md). Since Phase 4 the deployed site is **public-read**: anyone can browse without an account; login is only needed for posting and personal stats.
 
 ## Recommended Order 推荐顺序
 

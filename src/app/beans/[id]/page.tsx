@@ -1,9 +1,11 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { auth } from "@/auth";
 import { getBeanWithVisits, listPhotos } from "@/lib/queries";
 import { PROCESSING_METHODS, ROAST_LEVELS, optionLabel } from "@/lib/terms";
 import { PhotoGallery } from "@/components/PhotoGallery";
 import { PhotoUpload } from "@/components/PhotoUpload";
+import { ShareLinkButton } from "@/components/ShareLinkButton";
 import { VisitCard } from "@/components/VisitCard";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +27,8 @@ export default async function BeanDetailPage({
   }
 
   const photos = await listPhotos("bean", bean.id);
+  const session = await auth();
+  const loggedIn = typeof session?.user?.id === "number";
 
   const tags =
     bean.tasting_notes_tags
@@ -32,6 +36,12 @@ export default async function BeanDetailPage({
       .map((t) => t.trim())
       .filter(Boolean) ?? [];
   const visits = bean.visits;
+  const avgRating =
+    visits.length > 0
+      ? (
+          visits.reduce((sum, v) => sum + v.rating_overall, 0) / visits.length
+        ).toFixed(1)
+      : null;
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -43,13 +53,28 @@ export default async function BeanDetailPage({
       </Link>
 
       <div className="bg-white rounded-xl shadow-sm border border-cream-dark/50 p-8 mb-8">
-        <h1 className="text-3xl font-bold font-[Playfair_Display] text-espresso mb-2">
-          {bean.name}
-        </h1>
-        <p className="text-warm-gray text-lg mb-6">
+        <div className="flex items-start justify-between gap-3 mb-2">
+          <h1 className="text-3xl font-bold font-[Playfair_Display] text-espresso">
+            {bean.name}
+          </h1>
+          <ShareLinkButton />
+        </div>
+        <p
+          className={`text-warm-gray text-lg ${
+            avgRating !== null ? "mb-2" : "mb-6"
+          }`}
+        >
           {bean.origin_country}
           {bean.origin_region ? `, ${bean.origin_region}` : ""}
         </p>
+        {avgRating !== null && (
+          <p
+            data-testid="bean-community-stats"
+            className="text-sm text-warm-gray mb-6"
+          >
+            共 {visits.length} 次品尝记录 · 平均评分 ☕ {avgRating} 分
+          </p>
+        )}
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
           {bean.roaster && (
@@ -119,8 +144,8 @@ export default async function BeanDetailPage({
           <h2 className="text-xs text-warm-gray/70 uppercase tracking-wider mb-2">
             照片
           </h2>
-          <PhotoUpload entityType="bean" entityId={bean.id} />
-          <PhotoGallery photos={photos} />
+          {loggedIn && <PhotoUpload entityType="bean" entityId={bean.id} />}
+          <PhotoGallery photos={photos} canDelete={loggedIn} />
         </div>
       </div>
 

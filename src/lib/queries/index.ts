@@ -6,3 +6,5 @@ export * from "./visits";
 export * from "./photos";
 export * from "./stats";
 export * from "./users";
+export * from "./social";
+export * from "./crawls";

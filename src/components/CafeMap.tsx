@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { CafeWithStats } from "@/types";
+import type { LatLng } from "@/lib/geo";
 import { MapFilters } from "./MapFilters";
+import { NearbyList } from "./NearbyList";
 
 export function CafeMap() {
   const [cafes, setCafes] = useState<CafeWithStats[]>([]);
@@ -11,6 +13,39 @@ export function CafeMap() {
   const [city, setCity] = useState("");
   const [minRating, setMinRating] = useState("");
   const [brew, setBrew] = useState("");
+  const [coords, setCoords] = useState<LatLng | null>(null);
+  const [locating, setLocating] = useState(false);
+  const [geoError, setGeoError] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(false);
+
+  function handleNearbyClick() {
+    if (locating) return;
+    if (panelOpen) {
+      setPanelOpen(false);
+      return;
+    }
+    if (!("geolocation" in navigator)) {
+      setGeoError(true);
+      return;
+    }
+    setGeoError(false);
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setCoords({
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+        });
+        setLocating(false);
+        setPanelOpen(true);
+      },
+      () => {
+        setLocating(false);
+        setGeoError(true);
+      },
+      { timeout: 10000, maximumAge: 60000 }
+    );
+  }
 
   const filteredCafes = useMemo(
     () =>
@@ -71,7 +106,7 @@ export function CafeMap() {
 
   return (
     <div className="flex h-full w-full flex-col">
-      <div className="px-4 py-2 bg-cream border-b border-cream-dark/50">
+      <div className="px-4 py-2 bg-cream border-b border-cream-dark/50 flex flex-wrap items-center gap-2">
         <MapFilters
           cafes={cafes}
           city={city}
@@ -81,7 +116,34 @@ export function CafeMap() {
           onMinRatingChange={setMinRating}
           onBrewChange={setBrew}
         />
+        <button
+          type="button"
+          onClick={handleNearbyClick}
+          disabled={locating}
+          data-testid="nearby-button"
+          className="px-3 py-1.5 border border-cream-dark rounded-lg bg-white text-sm text-espresso hover:bg-cream-dark/40 disabled:opacity-60"
+        >
+          {locating
+            ? "定位中…"
+            : coords && panelOpen
+              ? "收起列表"
+              : "📍 附近的咖啡馆"}
+        </button>
+        {geoError && (
+          <span
+            role="status"
+            data-testid="nearby-error"
+            className="text-sm text-terracotta"
+          >
+            无法获取位置，请检查浏览器定位权限。
+          </span>
+        )}
       </div>
+      {panelOpen && coords && (
+        <div className="px-4 py-2 bg-white border-b border-cream-dark/50">
+          <NearbyList cafes={filteredCafes} origin={coords} />
+        </div>
+      )}
       <div data-testid="cafe-map" className="flex-1 min-h-0 w-full">
         <MapComponent cafes={filteredCafes} />
       </div>
