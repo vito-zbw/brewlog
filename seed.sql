@@ -99,3 +99,20 @@ INSERT INTO visit_beans (visit_id, bean_id) VALUES
 (7, 5),   -- Kurasu → 肯尼亚 AA
 (8, 6),   -- 鱼眼 → 哥伦比亚厌氧
 (9, 1);   -- Seesaw → 云南保山铁皮卡
+
+
+-- ============================================================
+-- FOLLOWS / CRAWLS（第四阶段演示数据）
+-- 注意：e2e 测试依赖 Baiwei 不关注任何人、Friend2 关注数为零 —
+-- 新增种子数据时不要违反这两条。
+-- ============================================================
+
+INSERT INTO follows (follower_id, following_id) VALUES
+(2, 1);   -- Friend1 关注 Baiwei
+
+INSERT INTO crawls (user_id, title, description, crawl_date) VALUES
+(2, '天河商圈咖啡对决', 'Seesaw 和 Manner 同一个商圈两种路线：一个做空间体验，一个做性价比。两家都点了意式对比，结论见各站笔记。', '2026-04-25');
+
+INSERT INTO crawl_visits (crawl_id, visit_id, stop_order) VALUES
+(1, 4, 1),   -- 第 1 站：Seesaw 太古汇
+(1, 5, 2);   -- 第 2 站：Manner 天环
