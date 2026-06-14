@@ -97,20 +97,84 @@ export async function getUserFavoriteBeans(
  * Links an OAuth sign-in to a user row by email, creating one on first
  * sign-in. Emails are normalized to lowercase (providers vary in casing and
  * SQLite UNIQUE is byte-sensitive — a case mismatch would split one person
- * into two accounts). The display name is only set on INSERT — OAuth profile
- * names must not overwrite curated names (dev login looks users up by name).
- * The avatar only updates when the provider supplies one.
+ * into two accounts). For returning users, only the avatar is refreshed —
+ * OAuth profile names must not overwrite curated display names. For new users,
+ * availableName() picks a free name under the unique-name index so a colliding
+ * provider name never throws a constraint error.
  */
 export async function upsertUserByEmail(
   email: string,
   name: string,
   image: string | null
 ): Promise<number> {
+  const normalized = email.toLowerCase();
+  const existing = firstRow<{ id: number }>(
+    await db.execute({
+      sql: "SELECT id FROM users WHERE email = ?",
+      args: [normalized],
+    })
+  );
+  if (existing) {
+    // Returning user: refresh the avatar only; keep their (possibly renamed)
+    // display name. The avatar updates only when the provider supplies one.
+    await db.execute({
+      sql: "UPDATE users SET image = COALESCE(?, image) WHERE id = ?",
+      args: [image, existing.id],
+    });
+    return Number(existing.id);
+  }
+  // New user: pick a free display name (unique index on name COLLATE NOCASE).
+  // A concurrent same-name signup is astronomically unlikely at this scale.
+  const finalName = await availableName(name);
   const rs = await db.execute({
-    sql: `INSERT INTO users (email, name, image) VALUES (?, ?, ?)
-          ON CONFLICT(email) DO UPDATE SET image = COALESCE(excluded.image, image)
-          RETURNING id`,
-    args: [email.toLowerCase(), name, image],
+    sql: "INSERT INTO users (email, name, image) VALUES (?, ?, ?) RETURNING id",
+    args: [normalized, finalName, image],
   });
   return Number(rs.rows[0]["id"]);
+}
+
+export async function updateUserName(
+  userId: number,
+  name: string
+): Promise<void> {
+  await db.execute({
+    sql: "UPDATE users SET name = ? WHERE id = ?",
+    args: [name, userId],
+  });
+}
+
+/** Case-insensitive: another user (id != excludeUserId) already holds this name. */
+export async function isNameTaken(
+  name: string,
+  excludeUserId: number
+): Promise<boolean> {
+  const rs = await db.execute({
+    sql: "SELECT 1 FROM users WHERE name = ? COLLATE NOCASE AND id <> ? LIMIT 1",
+    args: [name, excludeUserId],
+  });
+  return rs.rows.length > 0;
+}
+
+export async function updateUserImage(
+  userId: number,
+  image: string | null
+): Promise<void> {
+  await db.execute({
+    sql: "UPDATE users SET image = ? WHERE id = ?",
+    args: [image, userId],
+  });
+}
+
+/**
+ * A display name not yet taken (case-insensitive): `base`, else `base2`,
+ * `base3`, … Keeps OAuth first sign-in working under the unique-name index
+ * when a provider's profile name collides with an existing user. Pass 0 as
+ * the excludeUserId to isNameTaken so it checks every account.
+ */
+export async function availableName(base: string): Promise<string> {
+  if (!(await isNameTaken(base, 0))) return base;
+  for (let n = 2; ; n++) {
+    const candidate = `${base}${n}`;
+    if (!(await isNameTaken(candidate, 0))) return candidate;
+  }
 }
