@@ -106,9 +106,11 @@ test.describe("photos", () => {
   });
 
   test("deletes a photo through the gallery ✕ button", async ({ page }) => {
-    // Upload onto café 6 (Something For Café) — no other spec touches it,
-    // so absolute counts are safe here.
-    const src = await uploadPhoto(page, "/cafes/6");
+    // Upload onto café 7 (Kurasu Kyoto): photo upload is owner-gated, so the
+    // café must belong to the default session (Baiwei = user 1) for the upload
+    // UI to render. Café 7 is Baiwei's and no other spec touches it. Counts are
+    // relative (before vs. after), so prior photos on it would be harmless.
+    const src = await uploadPhoto(page, "/cafes/7");
     const gallery = page.getByTestId("gallery-image");
     const before = await gallery.count();
 
