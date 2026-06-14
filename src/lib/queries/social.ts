@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import type { FollowCounts, LeaderboardEntry } from "@/types";
+import type { FollowCounts, FollowUser, LeaderboardEntry } from "@/types";
 import { mapRows, firstRow } from "./util";
 
 export async function follow(
@@ -44,6 +44,56 @@ export async function getFollowCounts(userId: number): Promise<FollowCounts> {
     })
   );
   return row ?? { followers: 0, following: 0 };
+}
+
+interface RawFollowUser {
+  id: number;
+  name: string;
+  image: string | null;
+  is_mutual: number; // SQLite EXISTS → 0 | 1
+}
+
+function toFollowUser(r: RawFollowUser): FollowUser {
+  return {
+    id: r.id,
+    name: r.name,
+    image: r.image,
+    isMutual: Number(r.is_mutual) === 1,
+  };
+}
+
+/** People `userId` follows, newest first. `isMutual` = they follow back. */
+export async function getFollowing(userId: number): Promise<FollowUser[]> {
+  const rs = await db.execute({
+    sql: `SELECT u.id, u.name, u.image,
+                 EXISTS(
+                   SELECT 1 FROM follows r
+                   WHERE r.follower_id = u.id AND r.following_id = ?
+                 ) AS is_mutual
+          FROM follows f
+          JOIN users u ON u.id = f.following_id
+          WHERE f.follower_id = ?
+          ORDER BY f.created_at DESC`,
+    args: [userId, userId],
+  });
+  return mapRows<RawFollowUser>(rs).map(toFollowUser);
+}
+
+/** People who follow `userId`, newest first. `isMutual` = userId follows back. */
+export async function getFollowers(userId: number): Promise<FollowUser[]> {
+  const rs = await db.execute({
+    sql: `SELECT u.id, u.name, u.image,
+                 EXISTS(
+                   SELECT 1 FROM follows r
+                   WHERE r.follower_id = ? AND r.following_id = u.id
+                 ) AS is_mutual
+          FROM follows f
+          JOIN users u ON u.id = f.follower_id
+          WHERE f.following_id = ?
+          ORDER BY f.created_at DESC`,
+    args: [userId, userId],
+  });
+  return mapRows<RawFollowUser>(rs).map(toFollowUser);
 }
 
 /** Users ranked by distinct bean origins tasted across their visits. */

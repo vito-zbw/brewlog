@@ -12,6 +12,7 @@ import {
 import { formatVisitDate } from "@/lib/terms";
 import { VisitCard } from "@/components/VisitCard";
 import { FollowButton } from "@/components/FollowButton";
+import { FollowCounts } from "@/components/FollowCounts";
 
 export const dynamic = "force-dynamic";
 
@@ -71,11 +72,19 @@ export default async function UserProfilePage({
           <p className="text-warm-gray text-sm mt-1">
             加入于 {formatVisitDate(user.created_at)}
           </p>
-          <p className="text-warm-gray text-sm mt-1">
-            <span data-testid="follow-counts">
-              {followCounts.following} 关注 · {followCounts.followers} 粉丝
-            </span>
-          </p>
+          {viewerId === userId ? (
+            <FollowCounts
+              userId={userId}
+              following={followCounts.following}
+              followers={followCounts.followers}
+            />
+          ) : (
+            <p className="text-warm-gray text-sm mt-1">
+              <span data-testid="follow-counts">
+                {followCounts.following} 关注 · {followCounts.followers} 粉丝
+              </span>
+            </p>
+          )}
         </div>
         {viewerId !== null && viewerId !== userId && (
           <FollowButton targetUserId={userId} initialFollowing={viewerFollows} />

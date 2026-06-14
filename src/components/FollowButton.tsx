@@ -11,9 +11,11 @@ interface FollowResponse {
 export function FollowButton({
   targetUserId,
   initialFollowing,
+  followLabel = "关注",
 }: {
   targetUserId: number;
   initialFollowing: boolean;
+  followLabel?: string;
 }) {
   const router = useRouter();
   const [following, setFollowing] = useState(initialFollowing);
@@ -60,7 +62,7 @@ export function FollowButton({
             <span className="hidden group-hover:inline">取消关注</span>
           </>
         ) : (
-          "关注"
+          followLabel
         )}
       </button>
       {error && <p className="text-red-600 text-xs">{error}</p>}
