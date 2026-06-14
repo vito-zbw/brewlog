@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { AuthError } from "next-auth";
 import { auth, signIn } from "@/auth";
-import { createPasswordUser } from "@/lib/queries";
+import { createPasswordUser, isNameTaken } from "@/lib/queries";
 import { hashPassword } from "@/lib/password";
 import { safeRedirectTarget } from "@/lib/safe-redirect";
 
@@ -13,6 +13,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   weak: "密码至少需要 8 个字符。",
   mismatch: "两次输入的密码不一致。",
   exists: "该邮箱已被注册，请直接登录或更换邮箱。",
+  nametaken: "该昵称已被使用，请更换。",
   auth: "注册成功，但自动登录失败，请前往登录页登录。",
 };
 
@@ -39,6 +40,7 @@ async function registerAction(formData: FormData): Promise<void> {
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) fail("email");
   if (password.length < 8) fail("weak");
   if (password !== confirm) fail("mismatch");
+  if (await isNameTaken(name, 0)) fail("nametaken");
 
   // Returns null when the email already exists — registration NEVER sets a
   // password on a pre-existing account (that would be an account takeover).

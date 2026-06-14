@@ -1,5 +1,7 @@
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
+import { getUserById } from "@/lib/queries";
+import type { User } from "@/types";
 
 export class UnauthorizedError extends Error {
   constructor() {
@@ -24,4 +26,12 @@ export async function requireUserId(): Promise<number> {
   });
   if (rs.rows.length === 0) throw new UnauthorizedError();
   return id;
+}
+
+/** The DB user row for the current session, or null when logged out. */
+export async function getCurrentUser(): Promise<User | null> {
+  const session = await auth();
+  const id = session?.user?.id;
+  if (typeof id !== "number") return null;
+  return getUserById(id);
 }

@@ -93,12 +93,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             user.image ?? null
           );
         }
+        token.provider = account.provider;
       }
       return token;
     },
     session({ session, token }) {
       if (typeof token.userId === "number") {
-        return { ...session, user: { ...session.user, id: token.userId } };
+        return {
+          ...session,
+          user: {
+            ...session.user,
+            id: token.userId,
+            ...(typeof token.provider === "string"
+              ? { provider: token.provider }
+              : {}),
+          },
+        };
       }
       // Token without a userId (e.g. issued pre-Phase-3): leave the session
       // id-less — requireUserId() rejects it and the user just signs in again.
