@@ -1,7 +1,12 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { authConfig, devLoginEnabled } from "@/auth.config";
-import { getUserByName, upsertUserByEmail } from "@/lib/queries";
+import {
+  getUserByName,
+  getUserByEmailWithHash,
+  upsertUserByEmail,
+} from "@/lib/queries";
+import { verifyPassword } from "@/lib/password";
 
 // JWT sessions, no adapter: the jwt callback upserts a users row at sign-in
 // (keyed by email — same email across Google/GitHub = same BrewLog user) and
@@ -11,6 +16,36 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
   providers: [
     ...authConfig.providers,
+    // Site-wide email + password login (Phase 5). Always enabled. Lives here
+    // (not in the edge-safe auth.config.ts) because authorize() touches the
+    // DB and node:crypto. authorize() resolves the real users.id, so the jwt
+    // callback below sets token.userId directly — no email upsert.
+    Credentials({
+      id: "password",
+      name: "邮箱密码",
+      credentials: {
+        email: { label: "邮箱", type: "email" },
+        password: { label: "密码", type: "password" },
+      },
+      async authorize(credentials) {
+        const email =
+          typeof credentials?.email === "string" ? credentials.email : "";
+        const password =
+          typeof credentials?.password === "string" ? credentials.password : "";
+        if (!email || !password) return null;
+        const user = await getUserByEmailWithHash(email);
+        // verifyPassword runs scrypt even when the user/hash is absent, so a
+        // wrong email and a wrong password take the same time (no enumeration).
+        const ok = verifyPassword(password, user?.password_hash ?? null);
+        if (!user || !ok) return null;
+        return {
+          id: String(user.id),
+          name: user.name,
+          email: user.email,
+          image: user.image,
+        };
+      },
+    }),
     // Dev-only one-click login as a seeded user — powers local use and
     // Playwright without OAuth credentials. Never enabled in production
     // (the provider is not registered at all; see docs/setup/vercel-deploy.md).
@@ -39,14 +74,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
   callbacks: {
     async signIn({ user, account }) {
-      if (account?.provider === "dev-login") return true;
+      if (account?.provider === "dev-login" || account?.provider === "password")
+        return true;
       // OAuth identities without an email cannot be linked to a user row.
       return Boolean(user.email);
     },
     async jwt({ token, user, account }) {
       // `account` is only present on the sign-in request.
       if (account && user) {
-        if (account.provider === "dev-login") {
+        // dev-login and password both resolve the real users.id in authorize()
+        // — take it straight from the returned user, no email upsert.
+        if (account.provider === "dev-login" || account.provider === "password") {
           token.userId = Number(user.id);
         } else if (user.email) {
           token.userId = await upsertUserByEmail(

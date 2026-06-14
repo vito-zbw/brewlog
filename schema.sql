@@ -2,8 +2,9 @@
 -- Single source of truth for the data model.
 -- Apply with `npm run db:init` (local) or `turso db shell brewlog < schema.sql` (cloud).
 -- Fresh installs get this final shape directly; databases created before
--- Phase 3 are upgraded with scripts/migrate-phase3.mjs, and the Phase 4
--- tables (follows, crawls, crawl_visits) with scripts/migrate-phase4.mjs.
+-- Phase 3 are upgraded with scripts/migrate-phase3.mjs, the Phase 4
+-- tables (follows, crawls, crawl_visits) with scripts/migrate-phase4.mjs, and
+-- the Phase 5 users.password_hash column with scripts/migrate-phase5.mjs.
 --
 -- Enum-like columns (processing_method, roast_level, brew_method) store canonical
 -- English values; the bilingual "中文 English" display labels live in src/lib/terms.ts.
@@ -14,6 +15,7 @@ CREATE TABLE IF NOT EXISTS users (
     email TEXT NOT NULL UNIQUE,                  -- OAuth identity key (same email = same user across providers)
     name TEXT NOT NULL,                          -- display name; kept stable across OAuth sign-ins
     image TEXT,                                  -- avatar URL from the OAuth provider
+    password_hash TEXT,                          -- scrypt hash for email/password login; NULL for OAuth/dev-login users
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
