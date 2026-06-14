@@ -44,7 +44,14 @@ async function registerAction(formData: FormData): Promise<void> {
 
   // Returns null when the email already exists — registration NEVER sets a
   // password on a pre-existing account (that would be an account takeover).
-  const id = await createPasswordUser(email, name, hashPassword(password));
+  let id: number | null;
+  try {
+    id = await createPasswordUser(email, name, hashPassword(password));
+  } catch (err) {
+    // Lost the name race after the isNameTaken check — the unique index fired.
+    if (err instanceof Error && /UNIQUE/i.test(err.message)) fail("nametaken");
+    throw err;
+  }
   if (id === null) fail("exists");
 
   try {

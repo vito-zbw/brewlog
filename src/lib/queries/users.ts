@@ -97,10 +97,11 @@ export async function getUserFavoriteBeans(
  * Links an OAuth sign-in to a user row by email, creating one on first
  * sign-in. Emails are normalized to lowercase (providers vary in casing and
  * SQLite UNIQUE is byte-sensitive — a case mismatch would split one person
- * into two accounts). For returning users, only the avatar is refreshed —
- * OAuth profile names must not overwrite curated display names. For new users,
- * availableName() picks a free name under the unique-name index so a colliding
- * provider name never throws a constraint error.
+ * into two accounts). The upsert is atomic on the email conflict — a returning
+ * user keeps their (possibly curated) display name and only refreshes the
+ * avatar, so concurrent sign-ins for the same email can't race. A brand-new
+ * email whose provider name collides with the unique-name index is retried
+ * once with a free, suffixed name.
  */
 export async function upsertUserByEmail(
   email: string,
@@ -108,29 +109,26 @@ export async function upsertUserByEmail(
   image: string | null
 ): Promise<number> {
   const normalized = email.toLowerCase();
-  const existing = firstRow<{ id: number }>(
-    await db.execute({
-      sql: "SELECT id FROM users WHERE email = ?",
-      args: [normalized],
-    })
-  );
-  if (existing) {
-    // Returning user: refresh the avatar only; keep their (possibly renamed)
-    // display name. The avatar updates only when the provider supplies one.
-    await db.execute({
-      sql: "UPDATE users SET image = COALESCE(?, image) WHERE id = ?",
-      args: [image, existing.id],
+  const upsert = (displayName: string) =>
+    db.execute({
+      sql: `INSERT INTO users (email, name, image) VALUES (?, ?, ?)
+            ON CONFLICT(email) DO UPDATE SET image = COALESCE(excluded.image, image)
+            RETURNING id`,
+      args: [normalized, displayName, image],
     });
-    return Number(existing.id);
+  try {
+    const rs = await upsert(name);
+    return Number(rs.rows[0]["id"]);
+  } catch (err) {
+    // ON CONFLICT covers the email, so a UNIQUE error here means a new email
+    // whose display name collides with another user. Retry once with a free
+    // name rather than failing the sign-in.
+    if (err instanceof Error && /UNIQUE/i.test(err.message)) {
+      const rs = await upsert(await availableName(name));
+      return Number(rs.rows[0]["id"]);
+    }
+    throw err;
   }
-  // New user: pick a free display name (unique index on name COLLATE NOCASE).
-  // A concurrent same-name signup is astronomically unlikely at this scale.
-  const finalName = await availableName(name);
-  const rs = await db.execute({
-    sql: "INSERT INTO users (email, name, image) VALUES (?, ?, ?) RETURNING id",
-    args: [normalized, finalName, image],
-  });
-  return Number(rs.rows[0]["id"]);
 }
 
 export async function updateUserName(
@@ -173,8 +171,11 @@ export async function updateUserImage(
  */
 export async function availableName(base: string): Promise<string> {
   if (!(await isNameTaken(base, 0))) return base;
-  for (let n = 2; ; n++) {
+  for (let n = 2; n < 1000; n++) {
     const candidate = `${base}${n}`;
     if (!(await isNameTaken(candidate, 0))) return candidate;
   }
+  // Pathological (998 taken variants) — fall back to a guaranteed-unique-ish
+  // suffix rather than looping forever or throwing on sign-in.
+  return `${base}-${Date.now()}`;
 }
