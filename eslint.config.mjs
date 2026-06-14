@@ -21,6 +21,9 @@ const eslintConfig = defineConfig([
     // Generated test artifacts:
     "playwright-report/**",
     "test-results/**",
+    // Harness-managed git worktrees live here — never lint a nested checkout
+    // (its build output and tests aren't covered by this config's overrides).
+    ".claude/**",
   ]),
 ]);
 
