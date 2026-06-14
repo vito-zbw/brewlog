@@ -45,14 +45,17 @@ async function aBaiweiVisitId(request: APIRequestContext): Promise<number> {
 }
 
 test.describe("删除探店记录 — owner", () => {
-  test("owner deletes their visit from the detail page → redirected, gone", async ({
+  test("owner deletes their visit via the edit page → redirected, gone", async ({
     page,
     request,
   }) => {
     const visitId = await createVisit(request);
 
+    // Delete now lives on the edit page (mirrors crawls), reached via 编辑.
     await page.goto(`/visits/${visitId}`);
     await expect(page.getByTestId("visit-detail")).toBeVisible();
+    await page.getByTestId("visit-edit-link").click();
+    await expect(page).toHaveURL(`/visits/${visitId}/edit`);
 
     const deleteBtn = page.getByTestId("visit-delete");
     await expect(deleteBtn).toBeVisible();
@@ -97,11 +100,11 @@ test.describe("删除探店记录 — owner", () => {
 test.describe("删除探店记录 — logged out", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
-  test("no delete button on a visit detail page", async ({ page, request }) => {
+  test("no 编辑 link on a visit detail page", async ({ page, request }) => {
     const visitId = await aBaiweiVisitId(request);
     await page.goto(`/visits/${visitId}`);
     await expect(page.getByTestId("visit-detail")).toBeVisible();
-    await expect(page.getByTestId("visit-delete")).toHaveCount(0);
+    await expect(page.getByTestId("visit-edit-link")).toHaveCount(0);
   });
 
   test("DELETE /api/visits/[id] returns 401 and leaves the visit intact", async ({
@@ -118,11 +121,11 @@ test.describe("删除探店记录 — logged out", () => {
 test.describe("删除探店记录 — non-owner (Friend2)", () => {
   test.use({ storageState: "playwright/.auth/user2.json" });
 
-  test("no delete button on someone else's visit", async ({ page, request }) => {
+  test("no 编辑 link on someone else's visit", async ({ page, request }) => {
     const visitId = await aBaiweiVisitId(request);
     await page.goto(`/visits/${visitId}`);
     await expect(page.getByTestId("visit-detail")).toBeVisible();
-    await expect(page.getByTestId("visit-delete")).toHaveCount(0);
+    await expect(page.getByTestId("visit-edit-link")).toHaveCount(0);
   });
 
   test("DELETE another user's visit returns 403 and leaves it intact", async ({

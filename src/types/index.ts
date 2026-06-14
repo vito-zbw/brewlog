@@ -187,3 +187,6 @@ export interface NewVisitInput {
   notes?: string | null;
   bean_ids?: number[];
 }
+
+/** Fields editable on an existing visit (ownership/user_id never changes). */
+export type UpdateVisitInput = Omit<NewVisitInput, "user_id">;

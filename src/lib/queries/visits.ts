@@ -1,5 +1,10 @@
 import { db } from "@/lib/db";
-import type { Bean, NewVisitInput, VisitWithDetails } from "@/types";
+import type {
+  Bean,
+  NewVisitInput,
+  UpdateVisitInput,
+  VisitWithDetails,
+} from "@/types";
 import { mapRows, firstRow } from "./util";
 
 export interface VisitFilters {
@@ -150,6 +155,49 @@ export async function createVisit(
   const visit = await getVisitWithBeans(visitId);
   if (!visit) throw new Error("failed to load created visit");
   return visit;
+}
+
+/**
+ * Updates an existing visit and replaces its bean set in one transaction
+ * (mirror of updateCrawl). Leaves user_id untouched — ownership never moves.
+ */
+export async function updateVisit(
+  id: number,
+  input: UpdateVisitInput
+): Promise<void> {
+  const tx = await db.transaction("write");
+  try {
+    await tx.execute({
+      sql: `UPDATE visits SET cafe_id = ?, visit_date = ?, brew_method = ?,
+              rating_overall = ?, rating_bean_quality = ?,
+              rating_barista_skill = ?, rating_ambiance = ?, notes = ?
+            WHERE id = ?`,
+      args: [
+        input.cafe_id,
+        input.visit_date,
+        input.brew_method,
+        input.rating_overall,
+        input.rating_bean_quality,
+        input.rating_barista_skill,
+        input.rating_ambiance,
+        input.notes ?? null,
+        id,
+      ],
+    });
+    await tx.execute({
+      sql: "DELETE FROM visit_beans WHERE visit_id = ?",
+      args: [id],
+    });
+    for (const beanId of input.bean_ids ?? []) {
+      await tx.execute({
+        sql: "INSERT INTO visit_beans (visit_id, bean_id) VALUES (?, ?)",
+        args: [id, beanId],
+      });
+    }
+    await tx.commit();
+  } finally {
+    tx.close();
+  }
 }
 
 /**

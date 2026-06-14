@@ -7,7 +7,6 @@ import { RatingBeans } from "@/components/RatingBeans";
 import { PhotoGallery } from "@/components/PhotoGallery";
 import { PhotoUpload } from "@/components/PhotoUpload";
 import { ShareLinkButton } from "@/components/ShareLinkButton";
-import { VisitDeleteButton } from "@/components/VisitDeleteButton";
 
 export const dynamic = "force-dynamic";
 
@@ -76,7 +75,15 @@ export default async function VisitDetailPage({
           </span>
           <div className="flex items-center gap-2">
             <ShareLinkButton />
-            {isOwner && <VisitDeleteButton visitId={visitId} />}
+            {isOwner && (
+              <Link
+                data-testid="visit-edit-link"
+                href={`/visits/${visitId}/edit`}
+                className="px-3 py-1.5 border border-cream-dark rounded-lg text-sm text-espresso hover:bg-cream transition-colors"
+              >
+                编辑
+              </Link>
+            )}
           </div>
         </div>
 

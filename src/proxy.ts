@@ -15,6 +15,7 @@ function isProtectedPage(pathname: string): boolean {
   if (pathname === "/feed" || pathname.startsWith("/feed/")) return true;
   if (pathname === "/crawls/new") return true;
   if (/^\/crawls\/[^/]+\/edit$/.test(pathname)) return true;
+  if (/^\/visits\/[^/]+\/edit$/.test(pathname)) return true;
   return false;
 }
 
