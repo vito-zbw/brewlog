@@ -137,6 +137,13 @@ export interface FollowCounts {
   following: number;
 }
 
+export interface FollowUser {
+  id: number;
+  name: string;
+  image: string | null;
+  isMutual: boolean; // does the reverse follow relationship also exist?
+}
+
 export interface LeaderboardEntry {
   user_id: number;
   user_name: string;
