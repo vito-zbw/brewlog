@@ -24,6 +24,27 @@ test.describe("log a visit", () => {
   test("full inline-creation flow: new café + new bean + ratings → visit appears first in feed", async ({
     page,
   }) => {
+    // Mock the geocode proxy so the search→select flow is deterministic and
+    // offline. Returning 23.10/113.30/广州/中国 keeps the api-check assertions
+    // below valid without typing coordinates by hand.
+    await page.route("**/api/geocode**", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: [
+            {
+              displayName: `${cafeName}, 广州, 中国`,
+              latitude: 23.1,
+              longitude: 113.3,
+              city: "广州",
+              country: "中国",
+            },
+          ],
+        }),
+      })
+    );
+
     await page.goto("/log");
     await expect(
       page.getByRole("heading", { name: "记录探店", level: 1 })
@@ -33,13 +54,15 @@ test.describe("log a visit", () => {
 
     // No name select since Phase 3 — identity comes from the session (Baiwei).
 
-    // Inline café creation.
+    // Inline café creation via location search (no manual coordinates).
     await page.getByTestId("log-cafe-new-toggle").click();
     await page.getByTestId("log-new-cafe-name").fill(cafeName);
-    await page.getByTestId("log-new-cafe-city").fill("广州");
-    await page.getByTestId("log-new-cafe-country").fill("中国");
-    await page.getByTestId("log-new-cafe-lat").fill("23.10");
-    await page.getByTestId("log-new-cafe-lng").fill("113.30");
+    await page.getByTestId("log-cafe-search-input").fill("广州 咖啡");
+    await page.getByTestId("log-cafe-search-submit").click();
+    await page.getByTestId("log-cafe-search-result").first().click();
+    // The chosen result auto-fills city/country (and lat/lng in form state).
+    await expect(page.getByTestId("log-new-cafe-city")).toHaveValue("广州");
+    await expect(page.getByTestId("log-new-cafe-country")).toHaveValue("中国");
 
     // Inline bean creation.
     await page.getByTestId("log-add-new-bean").click();
@@ -123,5 +146,27 @@ test("submitting in existing-café mode with no café selected shows inline erro
   const error = page.getByTestId("log-error");
   await expect(error).toBeVisible();
   await expect(error).toContainText("请选择或新增咖啡馆");
+  await expect(page).toHaveURL("/log");
+});
+
+test("submitting a new café with no location chosen shows inline error and stays on /log", async ({
+  page,
+}) => {
+  await page.goto("/log");
+  await expect(
+    page.getByRole("heading", { name: "记录探店", level: 1 })
+  ).toBeVisible();
+  await expect(page.getByTestId("log-bean-chip").first()).toBeVisible();
+
+  await page.getByTestId("log-cafe-new-toggle").click();
+  await page.getByTestId("log-new-cafe-name").fill("无位置咖啡馆");
+  await page.getByTestId("log-new-cafe-city").fill("广州");
+  await page.getByTestId("log-new-cafe-country").fill("中国");
+  // No search/GPS/map pin → no coordinates captured.
+  await page.getByTestId("log-submit").click();
+
+  const error = page.getByTestId("log-error");
+  await expect(error).toBeVisible();
+  await expect(error).toContainText("请在地图上选择咖啡馆位置");
   await expect(page).toHaveURL("/log");
 });

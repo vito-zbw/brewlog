@@ -33,6 +33,15 @@ export interface Cafe {
   created_at: string;
 }
 
+/** Normalized geocoding hit returned by GET /api/geocode (Nominatim proxy). */
+export interface GeocodeResult {
+  displayName: string;
+  latitude: number;
+  longitude: number;
+  city: string;
+  country: string;
+}
+
 export interface Visit {
   id: number;
   cafe_id: number;

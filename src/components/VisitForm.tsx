@@ -7,6 +7,8 @@ import { BREW_METHODS } from "@/lib/terms";
 import { RatingInput } from "@/components/RatingInput";
 import { NewBeanForm } from "@/components/NewBeanForm";
 import { VisitDeleteButton } from "@/components/VisitDeleteButton";
+import { LocationPicker } from "@/components/LocationPicker";
+import type { LatLng } from "@/lib/geo";
 
 const inputClass =
   "w-full px-4 py-2 border border-cream-dark rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-terracotta/30 text-sm";
@@ -21,11 +23,12 @@ const RATING_FIELDS = [
   { key: "ambiance", label: "环境氛围", testId: "rating-ambiance" },
 ] as const;
 
+// City/country are auto-filled by the location picker (search/GPS) but stay
+// editable — geocoders sometimes mislabel Chinese localities. Latitude and
+// longitude are no longer typed; the LocationPicker captures them.
 const NEW_CAFE_FIELDS = [
   { key: "city", placeholder: "城市", testId: "log-new-cafe-city", type: "text" },
   { key: "country", placeholder: "国家", testId: "log-new-cafe-country", type: "text" },
-  { key: "lat", placeholder: "纬度", testId: "log-new-cafe-lat", type: "number" },
-  { key: "lng", placeholder: "经度", testId: "log-new-cafe-lng", type: "number" },
 ] as const;
 
 function todayLocal(): string {
@@ -112,6 +115,10 @@ export function VisitForm({ initial }: VisitFormProps) {
     try {
       let finalCafeId = cafeId ? Number(cafeId) : null;
       if (isNewCafe) {
+        if (!newCafe.lat || !newCafe.lng) {
+          setFormError("请在地图上选择咖啡馆位置");
+          return;
+        }
         const cafeRes = await fetch("/api/cafes", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -190,11 +197,29 @@ export function VisitForm({ initial }: VisitFormProps) {
               onChange={(e) => setNewCafe((p) => ({ ...p, name: e.target.value }))} className={inputClass} required />
             <div className="grid grid-cols-2 gap-3">
               {NEW_CAFE_FIELDS.map((f) => (
-                <input key={f.key} type={f.type} step={f.type === "number" ? "any" : undefined}
+                <input key={f.key} type={f.type}
                   placeholder={f.placeholder} data-testid={f.testId} value={newCafe[f.key]}
                   onChange={(e) => setNewCafe((p) => ({ ...p, [f.key]: e.target.value }))} className={inputClass} required />
               ))}
             </div>
+            <LocationPicker
+              value={
+                newCafe.lat && newCafe.lng
+                  ? { latitude: parseFloat(newCafe.lat), longitude: parseFloat(newCafe.lng) }
+                  : null
+              }
+              onChange={(p: LatLng) =>
+                setNewCafe((prev) => ({ ...prev, lat: String(p.latitude), lng: String(p.longitude) }))
+              }
+              onResolved={({ city, country }) =>
+                setNewCafe((prev) => ({
+                  ...prev,
+                  // Never clobber a value the user typed.
+                  city: prev.city || city,
+                  country: prev.country || country,
+                }))
+              }
+            />
           </div>
         ) : (
           <select data-testid="log-cafe-select" value={cafeId} onChange={(e) => setCafeId(e.target.value)} className={inputClass}>
