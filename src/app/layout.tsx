@@ -13,15 +13,21 @@ function NavLink({
   href,
   testId,
   children,
+  prefetch,
 }: {
   href: string;
   testId: string;
   children: React.ReactNode;
+  // Protected destinations pass prefetch={false}: their RSC prefetch runs the
+  // auth() proxy and would rotate (re-issue) the session cookie, which can
+  // resurrect a just-cleared session during logout. See src/proxy.ts.
+  prefetch?: boolean;
 }) {
   return (
     <Link
       href={href}
       data-testid={testId}
+      prefetch={prefetch}
       className="px-2 sm:px-3 py-2 rounded-lg text-cream/80 hover:text-cream hover:bg-espresso-light transition-colors text-sm font-medium whitespace-nowrap"
     >
       {children}
@@ -70,11 +76,12 @@ export default async function RootLayout({
                 <NavLink href="/crawls" testId="nav-crawls">咖啡之旅</NavLink>
                 <NavLink href="/leaderboard" testId="nav-leaderboard">排行榜</NavLink>
                 {user && (
-                  <NavLink href="/feed" testId="nav-feed">动态</NavLink>
+                  <NavLink href="/feed" testId="nav-feed" prefetch={false}>动态</NavLink>
                 )}
                 <Link
                   href="/log"
                   data-testid="nav-log"
+                  prefetch={false}
                   className="ml-2 px-4 py-2 bg-terracotta hover:bg-terracotta-light text-cream rounded-lg text-sm font-medium transition-colors whitespace-nowrap"
                 >
                   + 记录探店

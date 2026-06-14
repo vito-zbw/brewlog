@@ -41,6 +41,28 @@ export const proxy = auth((req) => {
   }
 });
 
+// Scope the matcher to ONLY the paths this proxy actually gates. Auth.js v5's
+// `auth()` wrapper runs getSession() — which, under the JWT strategy, re-signs
+// and re-issues the session cookie on EVERY matched request (no updateAge
+// throttle: nextauthjs/next-auth#13248) — before our callback runs. A catch-all
+// matcher therefore rotated the cookie on every public page and, crucially, on
+// every RSC <Link> prefetch. During logout those in-flight prefetches still
+// carried the pre-clear cookie and re-issued a fresh valid one AFTER signOut's
+// clear landed (last-Set-Cookie-wins), resurrecting the session ~half the time.
+// Limiting the matcher to protected paths means public pages and their
+// prefetches never invoke auth(), so the cookie is never rotated on the way out.
+// Mutation safety is unaffected — every mutating handler calls requireUserId()
+// itself; /api stays matched only to preserve the uniform 401 (APIs aren't
+// prefetched, so they don't reopen the race).
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon\\.ico).*)"],
+  matcher: [
+    "/log",
+    "/log/:path*",
+    "/feed",
+    "/feed/:path*",
+    "/crawls/new",
+    "/crawls/:id/edit",
+    "/visits/:id/edit",
+    "/api/:path*",
+  ],
 };
