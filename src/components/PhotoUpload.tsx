@@ -3,59 +3,11 @@
 import { useState, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import type { Photo, PhotoEntityType } from "@/types";
-
-const MAX_DIMENSION = 1600;
-const JPEG_QUALITY = 0.85;
+import { downscaleToJpeg } from "@/lib/image-client";
 
 interface PhotoUploadProps {
   entityType: PhotoEntityType;
   entityId: number;
-}
-
-function loadImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error("图片加载失败"));
-    img.src = src;
-  });
-}
-
-function canvasToJpegBlob(canvas: HTMLCanvasElement): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    canvas.toBlob(
-      (blob) => (blob ? resolve(blob) : reject(new Error("图片压缩失败"))),
-      "image/jpeg",
-      JPEG_QUALITY
-    );
-  });
-}
-
-// Downscale client-side so we never push full-resolution phone photos to R2.
-async function downscaleToJpeg(file: File): Promise<Blob> {
-  const objectUrl = URL.createObjectURL(file);
-  try {
-    const img = await loadImage(objectUrl);
-    const width = img.naturalWidth;
-    const height = img.naturalHeight;
-    const scale =
-      Math.max(width, height) > MAX_DIMENSION
-        ? MAX_DIMENSION / Math.max(width, height)
-        : 1;
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(width * scale);
-    canvas.height = Math.round(height * scale);
-    const ctx = canvas.getContext("2d");
-    if (!ctx) throw new Error("图片处理失败");
-    // JPEG has no alpha — without a white base, transparent PNG/WebP
-    // regions encode as solid black.
-    ctx.fillStyle = "#fff";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    return await canvasToJpegBlob(canvas);
-  } finally {
-    URL.revokeObjectURL(objectUrl);
-  }
 }
 
 export function PhotoUpload({ entityType, entityId }: PhotoUploadProps) {
@@ -72,7 +24,7 @@ export function PhotoUpload({ entityType, entityId }: PhotoUploadProps) {
     setError("");
     setUploading(true);
     try {
-      const blob = await downscaleToJpeg(file);
+      const blob = await downscaleToJpeg(file, 1600);
       const formData = new FormData();
       formData.append("file", blob, "photo.jpg");
       formData.append("entity_type", entityType);
