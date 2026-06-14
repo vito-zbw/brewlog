@@ -12,6 +12,10 @@ export async function GET(_request: Request, { params }: Params) {
     if (!Number.isInteger(targetId) || targetId <= 0) {
       return NextResponse.json({ error: "未找到该用户" }, { status: 404 });
     }
+    // Owner-private list: any id that isn't the caller's own is 403. We do NOT
+    // check existence first on purpose — a 404 for unknown ids would leak which
+    // user ids exist, and these lists are private. (The sibling /follow route
+    // does distinguish 404, because following is a public action.)
     if (targetId !== userId) {
       return NextResponse.json({ error: "无权查看" }, { status: 403 });
     }
