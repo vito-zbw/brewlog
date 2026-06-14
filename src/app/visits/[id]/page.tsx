@@ -7,6 +7,7 @@ import { RatingBeans } from "@/components/RatingBeans";
 import { PhotoGallery } from "@/components/PhotoGallery";
 import { PhotoUpload } from "@/components/PhotoUpload";
 import { ShareLinkButton } from "@/components/ShareLinkButton";
+import { VisitDeleteButton } from "@/components/VisitDeleteButton";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,7 @@ export default async function VisitDetailPage({
   const photos = await listPhotos("visit", visitId);
   const session = await auth();
   const loggedIn = typeof session?.user?.id === "number";
+  const isOwner = session?.user?.id === visit.user_id;
 
   const ratings = [
     { label: "总体评分", value: visit.rating_overall },
@@ -72,7 +74,10 @@ export default async function VisitDetailPage({
           <span className="text-xs px-2 py-0.5 rounded-full bg-espresso/10 text-espresso font-medium">
             {optionLabel(BREW_METHODS, visit.brew_method)}
           </span>
-          <ShareLinkButton />
+          <div className="flex items-center gap-2">
+            <ShareLinkButton />
+            {isOwner && <VisitDeleteButton visitId={visitId} />}
+          </div>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">

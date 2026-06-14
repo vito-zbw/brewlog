@@ -152,6 +152,73 @@ export async function createVisit(
   return visit;
 }
 
+/**
+ * Hard-deletes a visit and every dependent row (visit_beans join rows, the
+ * visit's photos, and crawl_visits stops), then resequences the remaining
+ * stops of any affected crawl to a dense 1..n order. Returns the deleted
+ * visit's photo storage keys so the caller can purge the underlying objects
+ * (storage I/O can't live inside the DB transaction).
+ *
+ * libsql does not enforce foreign keys, so every dependent is removed
+ * explicitly rather than relying on ON DELETE CASCADE — same reasoning as
+ * deleteCrawl in ./crawls.
+ */
+export async function deleteVisit(
+  id: number
+): Promise<{ photoKeys: string[] }> {
+  const tx = await db.transaction("write");
+  try {
+    const photoKeys = mapRows<{ storage_key: string }>(
+      await tx.execute({
+        sql: "SELECT storage_key FROM photos WHERE entity_type = 'visit' AND entity_id = ?",
+        args: [id],
+      })
+    ).map((r) => r.storage_key);
+
+    const crawlIds = mapRows<{ crawl_id: number }>(
+      await tx.execute({
+        sql: "SELECT crawl_id FROM crawl_visits WHERE visit_id = ?",
+        args: [id],
+      })
+    ).map((r) => r.crawl_id);
+
+    await tx.execute({
+      sql: "DELETE FROM visit_beans WHERE visit_id = ?",
+      args: [id],
+    });
+    await tx.execute({
+      sql: "DELETE FROM photos WHERE entity_type = 'visit' AND entity_id = ?",
+      args: [id],
+    });
+    await tx.execute({
+      sql: "DELETE FROM crawl_visits WHERE visit_id = ?",
+      args: [id],
+    });
+
+    // Renumber each affected crawl's remaining stops to a gap-free 1..n order.
+    // Runs after the deleted visit's row is gone, so the correlated count
+    // yields dense positions preserving the original order ([1,3,4] -> [1,2,3]).
+    for (const crawlId of crawlIds) {
+      await tx.execute({
+        sql: `UPDATE crawl_visits
+              SET stop_order = (
+                SELECT COUNT(*) FROM crawl_visits cv2
+                WHERE cv2.crawl_id = crawl_visits.crawl_id
+                  AND cv2.stop_order <= crawl_visits.stop_order
+              )
+              WHERE crawl_id = ?`,
+        args: [crawlId],
+      });
+    }
+
+    await tx.execute({ sql: "DELETE FROM visits WHERE id = ?", args: [id] });
+    await tx.commit();
+    return { photoKeys };
+  } finally {
+    tx.close();
+  }
+}
+
 export async function getDashboardStats(): Promise<{
   total_beans: number;
   total_cafes: number;
