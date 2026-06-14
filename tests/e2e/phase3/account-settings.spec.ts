@@ -19,6 +19,21 @@ test.describe("账号设置 /settings", () => {
     );
   });
 
+  test("own profile shows a settings gear linking to /settings", async ({
+    page,
+  }) => {
+    await page.goto("/users/1");
+    const gear = page.getByTestId("profile-settings-link");
+    await expect(gear).toBeVisible();
+    await gear.click();
+    await expect(page).toHaveURL("/settings");
+  });
+
+  test("another user's profile shows no settings gear", async ({ page }) => {
+    await page.goto("/users/2");
+    await expect(page.getByTestId("profile-settings-link")).toHaveCount(0);
+  });
+
   test("renames the user and reflects it in the nav", async ({ page }) => {
     await page.goto("/settings");
     await page.getByTestId("settings-name").fill("Baiwei临时");
