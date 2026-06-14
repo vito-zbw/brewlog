@@ -77,3 +77,15 @@ export async function entityExists(
   });
   return rs.rows.length > 0;
 }
+
+export async function getEntityOwner(
+  entityType: PhotoEntityType,
+  entityId: number
+): Promise<number | null> {
+  const rs = await db.execute({
+    sql: `SELECT user_id FROM ${ENTITY_TABLES[entityType]} WHERE id = ? LIMIT 1`,
+    args: [entityId],
+  });
+  if (rs.rows.length === 0) return null;
+  return rs.rows[0].user_id as number;
+}

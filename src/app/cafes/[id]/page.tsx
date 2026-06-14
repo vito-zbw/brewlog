@@ -37,7 +37,7 @@ export default async function CafeDetailPage({
     getCafeCommunityStats(cafeId),
     auth(),
   ]);
-  const loggedIn = typeof session?.user?.id === "number";
+  const isOwner = session?.user?.id === cafe.user_id;
 
   // getVisitsWithBeans orders by visit_date DESC, so visits[0] is the newest.
   const lastVisitDate = visits.length > 0 ? visits[0].visit_date : null;
@@ -110,8 +110,8 @@ export default async function CafeDetailPage({
         照片
       </h2>
       <div className="mb-8 space-y-4">
-        {loggedIn && <PhotoUpload entityType="cafe" entityId={cafeId} />}
-        <PhotoGallery photos={photos} canDelete={loggedIn} />
+        {isOwner && <PhotoUpload entityType="cafe" entityId={cafeId} />}
+        <PhotoGallery photos={photos} currentUserId={session?.user?.id ?? null} />
       </div>
 
       <h2 className="text-2xl font-bold font-[Playfair_Display] text-espresso mb-4">

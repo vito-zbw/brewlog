@@ -3,11 +3,11 @@ import { PhotoDeleteButton } from "./PhotoDeleteButton";
 
 interface PhotoGalleryProps {
   photos: Photo[];
-  /** Show the per-photo delete button (signed-in visitors only). */
-  canDelete?: boolean;
+  /** Current user's id — delete button appears only on photos they uploaded. */
+  currentUserId?: number | null;
 }
 
-export function PhotoGallery({ photos, canDelete = false }: PhotoGalleryProps) {
+export function PhotoGallery({ photos, currentUserId }: PhotoGalleryProps) {
   if (photos.length === 0) return null;
 
   return (
@@ -24,7 +24,9 @@ export function PhotoGallery({ photos, canDelete = false }: PhotoGalleryProps) {
             data-testid="gallery-image"
             className="rounded-lg object-cover aspect-square w-full"
           />
-          {canDelete && <PhotoDeleteButton photoId={photo.id} />}
+          {currentUserId != null && currentUserId === photo.user_id && (
+            <PhotoDeleteButton photoId={photo.id} />
+          )}
           {photo.caption && (
             <p className="mt-1 text-xs text-warm-gray truncate">
               {photo.caption}
