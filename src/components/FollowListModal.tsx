@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { FollowUser } from "@/types";
 import { FollowButton } from "./FollowButton";
@@ -30,26 +30,31 @@ export function FollowListModal({
   const [users, setUsers] = useState<FollowUser[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/users/${userId}/${kind}`);
-      const body = (await res.json()) as ListResponse;
-      if (!res.ok || !body.data) {
-        setError(body.error ?? "加载失败");
-        return;
-      }
-      setUsers(body.data);
-    } catch {
-      setError("加载失败");
-    }
-  }, [userId, kind]);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
-    setError(null);
-    setUsers(null);
+    let active = true;
+    async function load() {
+      setUsers(null);
+      setError(null);
+      try {
+        const res = await fetch(`/api/users/${userId}/${kind}`);
+        const body = (await res.json()) as ListResponse;
+        if (!active) return;
+        if (!res.ok || !body.data) {
+          setError(body.error ?? "加载失败");
+          return;
+        }
+        setUsers(body.data);
+      } catch {
+        if (active) setError("加载失败");
+      }
+    }
     void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, kind]);
+    return () => {
+      active = false;
+    };
+  }, [userId, kind, reloadKey]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -93,7 +98,7 @@ export function FollowListModal({
               <p className="text-warm-gray text-sm mb-3">{error}</p>
               <button
                 type="button"
-                onClick={load}
+                onClick={() => setReloadKey((k) => k + 1)}
                 className="px-4 py-1.5 rounded-full text-sm border border-cream-dark text-warm-gray hover:border-terracotta hover:text-terracotta transition-colors"
               >
                 重试
