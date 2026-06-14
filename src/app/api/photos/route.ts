@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createPhoto, entityExists } from "@/lib/queries";
+import { createPhoto, entityExists, getEntityOwner } from "@/lib/queries";
 import { isSupportedImageType, savePhoto } from "@/lib/storage";
 import { requireUserId, UnauthorizedError } from "@/lib/auth-helpers";
 import type { PhotoEntityType } from "@/types";
@@ -33,6 +33,13 @@ export async function POST(request: NextRequest) {
     }
     if (!(await entityExists(entityType as PhotoEntityType, entityId))) {
       return NextResponse.json({ error: "关联对象不存在" }, { status: 404 });
+    }
+    const ownerUserId = await getEntityOwner(
+      entityType as PhotoEntityType,
+      entityId
+    );
+    if (ownerUserId !== userId) {
+      return NextResponse.json({ error: "只能为自己的内容上传照片" }, { status: 403 });
     }
     if (!isSupportedImageType(file.type)) {
       return NextResponse.json(

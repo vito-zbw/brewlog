@@ -72,9 +72,6 @@ export default async function RootLayout({
                 {user && (
                   <NavLink href="/feed" testId="nav-feed">动态</NavLink>
                 )}
-                {user && (
-                  <NavLink href="/settings" testId="nav-settings">设置</NavLink>
-                )}
                 <Link
                   href="/log"
                   data-testid="nav-log"

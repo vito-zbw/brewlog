@@ -28,7 +28,7 @@ export default async function BeanDetailPage({
 
   const photos = await listPhotos("bean", bean.id);
   const session = await auth();
-  const loggedIn = typeof session?.user?.id === "number";
+  const isOwner = session?.user?.id === bean.user_id;
 
   const tags =
     bean.tasting_notes_tags
@@ -144,8 +144,8 @@ export default async function BeanDetailPage({
           <h2 className="text-xs text-warm-gray/70 uppercase tracking-wider mb-2">
             照片
           </h2>
-          {loggedIn && <PhotoUpload entityType="bean" entityId={bean.id} />}
-          <PhotoGallery photos={photos} canDelete={loggedIn} />
+          {isOwner && <PhotoUpload entityType="bean" entityId={bean.id} />}
+          <PhotoGallery photos={photos} currentUserId={session?.user?.id ?? null} />
         </div>
       </div>
 

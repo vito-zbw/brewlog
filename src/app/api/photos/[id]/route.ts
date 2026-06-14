@@ -8,7 +8,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await requireUserId();
+    const userId = await requireUserId();
     const { id } = await params;
     const photoId = Number(id);
     if (!Number.isInteger(photoId) || photoId <= 0) {
@@ -17,6 +17,9 @@ export async function DELETE(
     const photo = await getPhoto(photoId);
     if (!photo) {
       return NextResponse.json({ error: "未找到该照片" }, { status: 404 });
+    }
+    if (photo.user_id !== userId) {
+      return NextResponse.json({ error: "只能删除自己上传的照片" }, { status: 403 });
     }
     await deletePhoto(photoId);
     // Row first, object second: a row pointing at a deleted object would be a

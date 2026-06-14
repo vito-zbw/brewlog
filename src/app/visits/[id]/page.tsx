@@ -28,7 +28,6 @@ export default async function VisitDetailPage({
 
   const photos = await listPhotos("visit", visitId);
   const session = await auth();
-  const loggedIn = typeof session?.user?.id === "number";
   const isOwner = session?.user?.id === visit.user_id;
 
   const ratings = [
@@ -140,8 +139,8 @@ export default async function VisitDetailPage({
         照片
       </h2>
       <div className="space-y-4">
-        {loggedIn && <PhotoUpload entityType="visit" entityId={visitId} />}
-        <PhotoGallery photos={photos} canDelete={loggedIn} />
+        {isOwner && <PhotoUpload entityType="visit" entityId={visitId} />}
+        <PhotoGallery photos={photos} currentUserId={session?.user?.id ?? null} />
       </div>
     </div>
   );
