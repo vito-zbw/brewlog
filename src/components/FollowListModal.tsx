@@ -182,6 +182,9 @@ function FollowRow({
           )}
         </span>
       </Link>
+      {/* The button manages its own follow state and refreshes the server
+          counts; the row's mutual badge above is from the initial fetch and
+          intentionally not re-computed until the modal is reopened. */}
       <FollowButton
         targetUserId={user.id}
         initialFollowing={kind === "following" ? true : user.isMutual}
