@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { PhotoEntityType } from "@/types";
 
 // Photo storage backend: Cloudflare R2 when all R2_* env vars are present
 // (see docs/setup/r2-setup.md), otherwise local disk under data/uploads
@@ -76,11 +75,11 @@ async function getS3Client() {
 export async function savePhoto(
   data: Buffer,
   contentType: string,
-  entityType: PhotoEntityType
+  keyPrefix: string
 ): Promise<string> {
   const ext = EXTENSIONS[contentType];
   if (!ext) throw new Error(`unsupported content type: ${contentType}`);
-  const key = `${entityType}/${randomUUID()}.${ext}`;
+  const key = `${keyPrefix}/${randomUUID()}.${ext}`;
 
   if (r2Config) {
     const { PutObjectCommand } = await import("@aws-sdk/client-s3");
