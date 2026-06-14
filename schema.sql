@@ -111,3 +111,6 @@ CREATE INDEX IF NOT EXISTS idx_visits_user ON visits(user_id);
 CREATE INDEX IF NOT EXISTS idx_photos_entity ON photos(entity_type, entity_id);
 CREATE INDEX IF NOT EXISTS idx_follows_following ON follows(following_id);
 CREATE INDEX IF NOT EXISTS idx_crawls_user ON crawls(user_id);
+-- Display names are unique across users (case-insensitive: NOCASE folds ASCII
+-- only, so CJK names compare exactly). Enforced from the settings feature on.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_name_nocase ON users(name COLLATE NOCASE);
