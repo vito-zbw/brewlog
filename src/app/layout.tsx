@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { auth, signOut } from "@/auth";
+import { signOut } from "@/auth";
+import { getCurrentUser } from "@/lib/auth-helpers";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -33,13 +34,9 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const session = await auth();
-  // Treat sessions without a numeric user id (e.g. tokens issued before
-  // Phase 3) as logged out in the nav.
-  const user =
-    session?.user && typeof session.user.id === "number"
-      ? session.user
-      : null;
+  // DB row (not the JWT) so a renamed name or changed avatar shows immediately
+  // after router.refresh(). Logged-out (or pre-Phase-3 id-less tokens) → null.
+  const user = await getCurrentUser();
   return (
     <html lang="zh-CN">
       <head>
@@ -74,6 +71,9 @@ export default async function RootLayout({
                 <NavLink href="/leaderboard" testId="nav-leaderboard">排行榜</NavLink>
                 {user && (
                   <NavLink href="/feed" testId="nav-feed">动态</NavLink>
+                )}
+                {user && (
+                  <NavLink href="/settings" testId="nav-settings">设置</NavLink>
                 )}
                 <Link
                   href="/log"
