@@ -67,7 +67,7 @@ CREATE TABLE IF NOT EXISTS visit_beans (
 
 CREATE TABLE IF NOT EXISTS photos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    entity_type TEXT NOT NULL CHECK(entity_type IN ('bean','cafe','visit')),
+    entity_type TEXT NOT NULL CHECK(entity_type IN ('bean','visit')),  -- cafés have no photos of their own; café photos live on visits
     entity_id INTEGER NOT NULL,                  -- id within the entity_type table (no FK across three tables)
     storage_key TEXT NOT NULL,                   -- key in R2 / data/uploads; public URL computed at read time
     content_type TEXT NOT NULL,                  -- e.g. image/jpeg

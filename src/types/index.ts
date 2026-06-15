@@ -78,7 +78,10 @@ export interface BeanWithVisits extends Bean {
   visits: VisitWithDetails[];
 }
 
-export type PhotoEntityType = "bean" | "cafe" | "visit";
+// Photos attach only to beans and visits. A café has no photos of its own —
+// photos taken at a café belong to a visit there. (The schema's CHECK historically
+// also allowed 'cafe'; that capability was removed, see schema.sql.)
+export type PhotoEntityType = "bean" | "visit";
 
 export interface Photo {
   id: number;

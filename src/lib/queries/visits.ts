@@ -239,6 +239,11 @@ async function gcCafeIfOrphaned(tx: WriteTx, cafeId: number): Promise<string[]> 
     })
   );
   if (!remaining || remaining.n !== 0) return [];
+  // Café photos can no longer be created (cafés have no photo UI; the API no
+  // longer accepts entity_type='cafe'), but production may still hold rows from
+  // before that capability was removed. Sweep any such legacy rows + their
+  // storage objects here so a GC'd café leaves nothing orphaned. On fresh DBs
+  // the schema CHECK forbids 'cafe', so this is simply a no-op there.
   const keys = mapRows<{ storage_key: string }>(
     await tx.execute({
       sql: "SELECT storage_key FROM photos WHERE entity_type = 'cafe' AND entity_id = ?",

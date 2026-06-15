@@ -61,7 +61,6 @@ export async function deletePhoto(id: number): Promise<void> {
 
 const ENTITY_TABLES: Record<PhotoEntityType, string> = {
   bean: "beans",
-  cafe: "cafes",
   visit: "visits",
 };
 

@@ -1,14 +1,11 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { auth } from "@/auth";
 import {
   getCafe,
   getCafeCommunityStats,
   getVisitsWithBeans,
-  listPhotos,
 } from "@/lib/queries";
 import { formatVisitDate } from "@/lib/terms";
-import { PhotoGallery } from "@/components/PhotoGallery";
 import { ShareLinkButton } from "@/components/ShareLinkButton";
 import { VisitCard } from "@/components/VisitCard";
 
@@ -30,11 +27,9 @@ export default async function CafeDetailPage({
     notFound();
   }
 
-  const [visits, photos, stats, session] = await Promise.all([
+  const [visits, stats] = await Promise.all([
     getVisitsWithBeans({ cafeId }),
-    listPhotos("cafe", cafeId),
     getCafeCommunityStats(cafeId),
-    auth(),
   ]);
 
   // getVisitsWithBeans orders by visit_date DESC, so visits[0] is the newest.
@@ -92,13 +87,6 @@ export default async function CafeDetailPage({
             </p>
           </div>
         )}
-      </div>
-
-      <h2 className="text-2xl font-bold font-[Playfair_Display] text-espresso mb-4">
-        照片
-      </h2>
-      <div className="mb-8 space-y-4">
-        <PhotoGallery photos={photos} currentUserId={session?.user?.id ?? null} />
       </div>
 
       <h2 className="text-2xl font-bold font-[Playfair_Display] text-espresso mb-4">

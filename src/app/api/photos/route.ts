@@ -10,7 +10,7 @@ import { requireUserId, UnauthorizedError } from "@/lib/auth-helpers";
 import type { PhotoEntityType } from "@/types";
 
 const MAX_BYTES = 4 * 1024 * 1024; // client downscales first; Vercel caps bodies at ~4.5MB
-const ENTITY_TYPES: PhotoEntityType[] = ["bean", "cafe", "visit"];
+const ENTITY_TYPES: PhotoEntityType[] = ["bean", "visit"];
 
 // Public read — intentional, matching the app's access model: every viewing
 // page and GET API works without login, and the entity detail pages already

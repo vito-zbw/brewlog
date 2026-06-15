@@ -1,33 +1,9 @@
 import { readFileSync } from "node:fs";
-import type { APIRequestContext } from "@playwright/test";
 import { test, expect } from "../../helpers/fixtures";
 
 // Path is relative to the repo root, where Playwright (and this Node
 // process) runs from.
 const FIXTURE = "tests/fixtures/test-photo.jpg";
-
-// Uploads one photo to an entity via the API and returns its public URL. The
-// inline detail-page uploader has been retired across the app; photos are added
-// through the visit/bean forms or directly via the API.
-async function apiUploadPhoto(
-  request: APIRequestContext,
-  entityType: string,
-  entityId: number
-): Promise<string> {
-  const res = await request.post("/api/photos", {
-    multipart: {
-      file: {
-        name: "photo.jpg",
-        mimeType: "image/jpeg",
-        buffer: readFileSync(FIXTURE),
-      },
-      entity_type: entityType,
-      entity_id: String(entityId),
-    },
-  });
-  expect(res.status()).toBe(201);
-  return ((await res.json()) as { data: { url: string } }).data.url;
-}
 
 test.describe("photos", () => {
   test("attaches a photo to a visit via the edit form and serves it back", async ({
@@ -125,26 +101,33 @@ test.describe("photos", () => {
     expect(body.error).toBe("关联对象不存在");
   });
 
-  test("deletes a photo through the café gallery ✕ button", async ({
+  test("cafés have no photos: API rejects café uploads and the detail page has no gallery", async ({
     page,
     request,
   }) => {
-    // Café 7 (Kurasu Kyoto) belongs to Baiwei (the default session). Upload via
-    // the API (the inline café uploader was removed); the gallery's ✕ delete on
-    // the café detail page is unchanged. The newest photo is first, so deleting
-    // .first() removes the one we just uploaded.
-    const src = await apiUploadPhoto(request, "cafe", 7);
+    // Café photos were removed app-wide — a café has no photos of its own, so
+    // 'cafe' is no longer a valid photo entity type. The API rejects it (the
+    // same 400 path as any unknown type) and the café detail page, which once
+    // hosted a standalone gallery, now renders no "照片" heading and no images.
+    const rejected = await request.post("/api/photos", {
+      multipart: {
+        file: {
+          name: "photo.jpg",
+          mimeType: "image/jpeg",
+          buffer: readFileSync(FIXTURE),
+        },
+        entity_type: "cafe",
+        entity_id: "7",
+      },
+    });
+    expect(rejected.status()).toBe(400);
+    expect(((await rejected.json()) as { error?: string }).error).toBe(
+      "关联对象无效"
+    );
+
     await page.goto("/cafes/7");
-    const gallery = page.getByTestId("gallery-image");
-    const before = await gallery.count();
-    expect(before).toBeGreaterThan(0);
-
-    page.on("dialog", (dialog) => dialog.accept());
-    await page.getByTestId("photo-delete-button").first().click();
-
-    await expect.poll(() => gallery.count()).toBe(before - 1);
-    // The stored object is gone too — the old URL now 404s.
-    const response = await page.request.get(src);
-    expect(response.status()).toBe(404);
+    await expect(page.getByTestId("cafe-detail")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "照片" })).toHaveCount(0);
+    await expect(page.getByTestId("gallery-image")).toHaveCount(0);
   });
 });
