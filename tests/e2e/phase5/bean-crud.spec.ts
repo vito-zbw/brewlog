@@ -1,5 +1,5 @@
 import { test, expect } from "../../helpers/fixtures";
-import type { APIRequestContext, Page } from "@playwright/test";
+import type { APIRequestContext } from "@playwright/test";
 
 // Full bean lifecycle: create (all fields + photo) in the log form, owner-gated
 // edit & delete, and the "block delete while a visit uses it" rule. Default
@@ -67,6 +67,9 @@ test.describe("咖啡豆 创建 — 完整字段 + 照片（log 表单）", () =
     const freetext = `这是一段独一无二的风味描述 ${Date.now()}`;
 
     await page.goto("/log");
+    // Wait for the client fetch to populate chips — proves the page hydrated
+    // before we click (mirrors log-visit.spec), avoiding a hydration race.
+    await expect(page.getByTestId("log-bean-chip").first()).toBeVisible();
     await page.getByTestId("log-add-new-bean").click();
 
     await page.getByTestId("new-bean-name").fill(name);
@@ -112,6 +115,64 @@ test.describe("咖啡豆 创建 — 完整字段 + 照片（log 表单）", () =
       .poll(() => page.getByTestId("gallery-image").count())
       .toBeGreaterThanOrEqual(1);
   });
+
+  test("bean is still saved when the photo upload fails (best-effort)", async ({
+    page,
+    request,
+  }) => {
+    const name = `E2E容错豆 ${Date.now()}`;
+
+    await page.goto("/log");
+    await expect(page.getByTestId("log-bean-chip").first()).toBeVisible();
+    await page.getByTestId("log-add-new-bean").click();
+    await page.getByTestId("new-bean-name").fill(name);
+    await page.getByTestId("new-bean-origin").fill("埃塞俄比亚");
+
+    // Make only the photo upload fail; bean creation (/api/beans) still works.
+    await page.route("**/api/photos", (route) => route.abort());
+    await page.getByTestId("new-bean-photo-input").setInputFiles(FIXTURE);
+    await page.getByTestId("new-bean-save").click();
+
+    // Notice shown, and the bean was created + selected despite the photo error.
+    await expect(page.getByTestId("log-bean-notice")).toContainText(
+      "照片上传失败"
+    );
+    await expect(
+      page.getByTestId("log-bean-chip").filter({ hasText: name })
+    ).toBeVisible();
+
+    const found = await request.get(
+      `/api/beans?search=${encodeURIComponent(name)}`
+    );
+    expect(((await found.json()) as { data: unknown[] }).data.length).toBe(1);
+  });
+});
+
+test.describe("咖啡豆 校验 — API", () => {
+  test("POST with an empty name is rejected → 400", async ({ request }) => {
+    const res = await request.post("/api/beans", {
+      data: { name: "  ", origin_country: "Ethiopia" },
+    });
+    expect(res.status()).toBe(400);
+    const body = (await res.json()) as { error?: string };
+    expect(body.error).toContain("必填");
+  });
+
+  test("PUT with an invalid roast_level is rejected → 400", async ({
+    request,
+  }) => {
+    const { id } = await createBean(request);
+    const res = await request.put(`/api/beans/${id}`, {
+      data: {
+        name: "改名",
+        origin_country: "Ethiopia",
+        roast_level: "NotARoast",
+      },
+    });
+    expect(res.status()).toBe(400);
+    const body = (await res.json()) as { error?: string };
+    expect(body.error).toContain("无效");
+  });
 });
 
 test.describe("咖啡豆 编辑 — owner", () => {
@@ -154,6 +215,30 @@ test.describe("咖啡豆 编辑 — owner", () => {
 
     const check = await request.get(`/api/beans/${id}`);
     expect(check.status()).toBe(404);
+  });
+
+  test("inline edit changes an owned bean's field and persists it", async ({
+    page,
+    request,
+  }) => {
+    const { id, name } = await createBean(request);
+    const newFarm = `内联编辑庄园 ${Date.now()}`;
+
+    await page.goto("/log");
+    await expect(
+      page.getByTestId("log-bean-chip").filter({ hasText: name })
+    ).toBeVisible();
+    await page.getByRole("button", { name: `编辑 ${name}` }).click();
+
+    await page.getByTestId("bean-edit-farm").fill(newFarm);
+    await page.getByTestId("bean-edit-save").click();
+
+    // The inline edit form closes once the PUT resolves.
+    await expect(page.getByTestId("bean-edit-farm")).toHaveCount(0);
+
+    const check = await request.get(`/api/beans/${id}`);
+    const bean = ((await check.json()) as { data: { farm: string } }).data;
+    expect(bean.farm).toBe(newFarm);
   });
 });
 

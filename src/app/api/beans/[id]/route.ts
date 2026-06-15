@@ -4,7 +4,7 @@ import {
   getBeanWithVisits,
   updateBean,
   deleteBean,
-  countBeanVisits,
+  BeanInUseError,
 } from "@/lib/queries";
 import { validateBeanBody } from "@/lib/bean-validation";
 import { requireUserId, UnauthorizedError } from "@/lib/auth-helpers";
@@ -72,6 +72,8 @@ export async function PUT(
       tasting_notes_freetext: body.tasting_notes_freetext ?? null,
     });
     const bean = await getBean(beanId);
+    // The endpoint promises a Bean on 200; never serialize { data: null }.
+    if (!bean) throw new Error("failed to load updated bean");
     return NextResponse.json({ data: bean });
   } catch (err) {
     if (err instanceof UnauthorizedError) {
@@ -104,16 +106,9 @@ export async function DELETE(
       );
     }
     // Owner decision: refuse to delete a bean any visit still references, so a
-    // delete never strands a visit. The owner removes it from those visits first.
-    const inUse = await countBeanVisits(beanId);
-    if (inUse > 0) {
-      return NextResponse.json(
-        {
-          error: `该咖啡豆被 ${inUse} 条探店记录使用，无法删除。请先在这些探店记录中移除它。`,
-        },
-        { status: 409 }
-      );
-    }
+    // delete never strands a visit. The atomic check lives inside deleteBean's
+    // transaction (BeanInUseError → 409); the owner removes it from those
+    // visits first.
     const { photoKeys } = await deleteBean(beanId);
     // Best-effort object purge (mirrors /api/visits/[id]); DB rows already gone.
     for (const key of photoKeys) {
@@ -130,6 +125,14 @@ export async function DELETE(
   } catch (err) {
     if (err instanceof UnauthorizedError) {
       return NextResponse.json({ error: "未登录" }, { status: 401 });
+    }
+    if (err instanceof BeanInUseError) {
+      return NextResponse.json(
+        {
+          error: `该咖啡豆被 ${err.count} 条探店记录使用，无法删除。请先在这些探店记录中移除它。`,
+        },
+        { status: 409 }
+      );
     }
     console.error("DELETE /api/beans/[id] failed:", err);
     return NextResponse.json({ error: "删除咖啡豆失败" }, { status: 500 });
