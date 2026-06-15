@@ -2,8 +2,8 @@
 
 import { useState, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
-import type { Photo, PhotoEntityType } from "@/types";
-import { downscaleToJpeg } from "@/lib/image-client";
+import type { PhotoEntityType } from "@/types";
+import { uploadEntityPhoto } from "@/lib/image-client";
 
 interface PhotoUploadProps {
   entityType: PhotoEntityType;
@@ -24,26 +24,11 @@ export function PhotoUpload({ entityType, entityId }: PhotoUploadProps) {
     setError("");
     setUploading(true);
     try {
-      const blob = await downscaleToJpeg(file, 1600);
-      const formData = new FormData();
-      formData.append("file", blob, "photo.jpg");
-      formData.append("entity_type", entityType);
-      formData.append("entity_id", String(entityId));
-      if (caption.trim()) formData.append("caption", caption.trim());
-
-      const res = await fetch("/api/photos", {
-        method: "POST",
-        body: formData,
-      });
-      const json = (await res.json()) as { data?: Photo; error?: string };
-      if (!res.ok || json.error || !json.data) {
-        setError(json.error ?? "上传失败，请重试。");
-        return;
-      }
+      await uploadEntityPhoto(entityType, entityId, file, caption);
       setCaption("");
       router.refresh();
-    } catch {
-      setError("上传失败，请重试。");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "上传失败，请重试。");
     } finally {
       setUploading(false);
       // Reset so selecting the same file again re-triggers onChange.

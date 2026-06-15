@@ -1,13 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { Bean, Cafe } from "@/types";
+import type { Bean, Cafe, Photo, UpdateBeanInput } from "@/types";
 import { BREW_METHODS } from "@/lib/terms";
 import { RatingInput } from "@/components/RatingInput";
-import { NewBeanForm } from "@/components/NewBeanForm";
+import { BeanForm } from "@/components/BeanForm";
 import { VisitDeleteButton } from "@/components/VisitDeleteButton";
 import { LocationPicker } from "@/components/LocationPicker";
+import { PhotoGallery } from "@/components/PhotoGallery";
+import { PhotoStager, type StagedPhoto } from "@/components/PhotoStager";
+import { uploadEntityPhoto } from "@/lib/image-client";
 import type { LatLng } from "@/lib/geo";
 
 const inputClass =
@@ -51,14 +54,25 @@ interface VisitFormProps {
     rating_ambiance: number;
     notes: string;
   };
+  /** Logged-in user id; enables inline edit/delete on beans they own. */
+  currentUserId?: number | null;
+  /** Existing photos for the visit (edit mode only); shown above the picker. */
+  initialPhotos?: Photo[];
 }
 
-export function VisitForm({ initial }: VisitFormProps) {
+export function VisitForm({
+  initial,
+  currentUserId = null,
+  initialPhotos,
+}: VisitFormProps) {
   const router = useRouter();
   const [cafes, setCafes] = useState<Cafe[]>([]);
   const [beans, setBeans] = useState<Bean[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
+  const [editingBeanId, setEditingBeanId] = useState<number | null>(null);
+  const [editingBeanPhotos, setEditingBeanPhotos] = useState<Photo[]>([]);
+  const [beanActionError, setBeanActionError] = useState("");
 
   const [cafeId, setCafeId] = useState(initial ? String(initial.cafe_id) : "");
   const [isNewCafe, setIsNewCafe] = useState(false);
@@ -78,6 +92,15 @@ export function VisitForm({ initial }: VisitFormProps) {
   );
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const [showNewBean, setShowNewBean] = useState(false);
+
+  const [stagedPhotos, setStagedPhotos] = useState<StagedPhoto[]>([]);
+  // Set once the visit row exists, so a photo-upload retry never re-creates it.
+  const [createdVisitId, setCreatedVisitId] = useState<number | null>(null);
+  // Monotonic local id source for staged photos.
+  const stagedIdRef = useRef(0);
+  // Latest staged list, read by the unmount cleanup to revoke preview URLs.
+  const stagedRef = useRef<StagedPhoto[]>([]);
+  stagedRef.current = stagedPhotos;
 
   useEffect(() => {
     async function load() {
@@ -101,10 +124,137 @@ export function VisitForm({ initial }: VisitFormProps) {
     setSelectedBeanIds((prev) => (prev.includes(id) ? prev.filter((b) => b !== id) : [...prev, id]));
   };
 
-  const handleBeanCreated = (bean: Bean) => {
+  // Inline create/edit: BeanForm owns the staged-photo upload + retry; these
+  // just save the bean's fields and return the saved bean (mirrors how the
+  // visit form itself stages photos and uploads after the row exists).
+  const createBeanFields = async (payload: UpdateBeanInput): Promise<Bean> => {
+    const res = await fetch("/api/beans", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const json = (await res.json()) as { data?: Bean; error?: string };
+    if (!res.ok || !json.data) {
+      throw new Error(json.error ?? "保存失败，请重试");
+    }
+    return json.data;
+  };
+
+  const onBeanCreated = (bean: Bean) => {
     setBeans((prev) => [bean, ...prev]);
     setSelectedBeanIds((prev) => [...prev, bean.id]);
     setShowNewBean(false);
+  };
+
+  const updateBeanFields = async (
+    payload: UpdateBeanInput
+  ): Promise<Bean> => {
+    // editingBeanId is always set while the inline edit form is rendered.
+    const res = await fetch(`/api/beans/${editingBeanId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const json = (await res.json()) as { data?: Bean; error?: string };
+    if (!res.ok || !json.data) {
+      throw new Error(json.error ?? "保存失败，请重试");
+    }
+    return json.data;
+  };
+
+  const onBeanUpdated = (bean: Bean) => {
+    setBeans((prev) => prev.map((b) => (b.id === bean.id ? bean : b)));
+    setEditingBeanId(null);
+  };
+
+  const handleBeanDelete = async (bean: Bean) => {
+    if (
+      !window.confirm(`确定删除咖啡豆「${bean.name}」吗？此操作不可撤销。`)
+    ) {
+      return;
+    }
+    setBeanActionError("");
+    try {
+      const res = await fetch(`/api/beans/${bean.id}`, { method: "DELETE" });
+      const json = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        setBeanActionError(json.error ?? "删除失败，请重试");
+        return;
+      }
+      setBeans((prev) => prev.filter((b) => b.id !== bean.id));
+      setSelectedBeanIds((prev) => prev.filter((id) => id !== bean.id));
+      if (editingBeanId === bean.id) setEditingBeanId(null);
+    } catch {
+      setBeanActionError("删除失败，请重试");
+    }
+  };
+
+  const startBeanEdit = async (id: number) => {
+    setShowNewBean(false);
+    setBeanActionError("");
+    // Load the bean's existing photos so the inline editor can manage them.
+    // Fetched before opening so BeanForm mounts with them ready (it seeds its
+    // existing-photo state from the prop on mount).
+    let photos: Photo[] = [];
+    try {
+      const res = await fetch(
+        `/api/photos?entity_type=bean&entity_id=${id}`
+      );
+      if (res.ok) photos = ((await res.json()) as { data?: Photo[] }).data ?? [];
+    } catch {
+      // Non-fatal — open the editor without the existing gallery.
+    }
+    setEditingBeanPhotos(photos);
+    setEditingBeanId(id);
+  };
+
+  const handleAddFiles = (files: File[]) => {
+    setStagedPhotos((prev) => [
+      ...prev,
+      ...files.map((file) => ({
+        id: `staged-${stagedIdRef.current++}`,
+        file,
+        previewUrl: URL.createObjectURL(file),
+        caption: "",
+      })),
+    ]);
+  };
+
+  const handleRemoveStaged = (id: string) => {
+    setStagedPhotos((prev) => {
+      const target = prev.find((p) => p.id === id);
+      if (target) URL.revokeObjectURL(target.previewUrl);
+      return prev.filter((p) => p.id !== id);
+    });
+  };
+
+  const handleCaptionChange = (id: string, caption: string) => {
+    setStagedPhotos((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, caption } : p))
+    );
+  };
+
+  // Free any outstanding object URLs when the form unmounts.
+  useEffect(() => {
+    return () => {
+      for (const p of stagedRef.current) URL.revokeObjectURL(p.previewUrl);
+    };
+  }, []);
+
+  // Uploads every staged photo to the given visit. Succeeded ones leave the
+  // staging list (and free their preview); returns how many failed.
+  const uploadStagedPhotos = async (visitId: number): Promise<number> => {
+    let failed = 0;
+    for (const photo of stagedPhotos) {
+      try {
+        await uploadEntityPhoto("visit", visitId, photo.file, photo.caption);
+        URL.revokeObjectURL(photo.previewUrl);
+        setStagedPhotos((prev) => prev.filter((p) => p.id !== photo.id));
+      } catch {
+        failed++;
+      }
+    }
+    return failed;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -113,62 +263,84 @@ export function VisitForm({ initial }: VisitFormProps) {
     setSubmitting(true);
 
     try {
-      let finalCafeId = cafeId ? Number(cafeId) : null;
-      if (isNewCafe) {
-        if (!newCafe.lat || !newCafe.lng) {
-          setFormError("请在地图上选择咖啡馆位置");
+      // On a photo-upload retry (create mode) the visit already exists — skip
+      // re-creating café + visit. Edit mode always re-saves the visit fields.
+      let targetVisitId = initial?.id ?? createdVisitId;
+
+      if (targetVisitId == null || initial) {
+        let finalCafeId = cafeId ? Number(cafeId) : null;
+        if (isNewCafe) {
+          if (!newCafe.lat || !newCafe.lng) {
+            setFormError("请在地图上选择咖啡馆位置");
+            return;
+          }
+          const cafeRes = await fetch("/api/cafes", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: newCafe.name,
+              city: newCafe.city,
+              country: newCafe.country,
+              latitude: parseFloat(newCafe.lat),
+              longitude: parseFloat(newCafe.lng),
+            }),
+          });
+          const cafeJson = (await cafeRes.json()) as { data?: Cafe; error?: string };
+          if (cafeJson.error || !cafeJson.data) {
+            setFormError(cafeJson.error ?? "新增咖啡馆失败，请重试");
+            return;
+          }
+          const createdCafe = cafeJson.data;
+          finalCafeId = createdCafe.id;
+          // 避免重试时重复创建咖啡馆：加入列表并切换为已有咖啡馆
+          setCafes((prev) => [createdCafe, ...prev]);
+          setCafeId(String(createdCafe.id));
+          setIsNewCafe(false);
+        }
+
+        if (!finalCafeId) {
+          setFormError("请选择或新增咖啡馆");
           return;
         }
-        const cafeRes = await fetch("/api/cafes", {
-          method: "POST",
+
+        const res = await fetch(initial ? `/api/visits/${initial.id}` : "/api/visits", {
+          method: initial ? "PUT" : "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            name: newCafe.name,
-            city: newCafe.city,
-            country: newCafe.country,
-            latitude: parseFloat(newCafe.lat),
-            longitude: parseFloat(newCafe.lng),
+            cafe_id: finalCafeId,
+            visit_date: visitDate,
+            brew_method: brewMethod,
+            rating_overall: ratings.overall,
+            rating_bean_quality: ratings.beanQuality,
+            rating_barista_skill: ratings.baristaSkill,
+            rating_ambiance: ratings.ambiance,
+            notes: notes || null,
+            bean_ids: selectedBeanIds,
           }),
         });
-        const cafeJson = (await cafeRes.json()) as { data?: Cafe; error?: string };
-        if (cafeJson.error || !cafeJson.data) {
-          setFormError(cafeJson.error ?? "新增咖啡馆失败，请重试");
+        const json = (await res.json()) as {
+          data?: { id: number };
+          error?: string;
+        };
+        if (!res.ok || json.error || !json.data) {
+          setFormError(json.error ?? "保存失败，请重试");
           return;
         }
-        const createdCafe = cafeJson.data;
-        finalCafeId = createdCafe.id;
-        // 避免重试时重复创建咖啡馆：加入列表并切换为已有咖啡馆
-        setCafes((prev) => [createdCafe, ...prev]);
-        setCafeId(String(createdCafe.id));
-        setIsNewCafe(false);
+        targetVisitId = initial ? initial.id : json.data.id;
+        // 避免重试时重复创建探店记录：记住已创建的 id
+        if (!initial) setCreatedVisitId(targetVisitId);
       }
 
-      if (!finalCafeId) {
-        setFormError("请选择或新增咖啡馆");
+      // Upload staged photos to the now-existing visit.
+      const failedCount = await uploadStagedPhotos(targetVisitId);
+      if (failedCount > 0) {
+        setFormError(
+          `探店记录已保存，但有 ${failedCount} 张照片上传失败，请重试。`
+        );
         return;
       }
 
-      const res = await fetch(initial ? `/api/visits/${initial.id}` : "/api/visits", {
-        method: initial ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          cafe_id: finalCafeId,
-          visit_date: visitDate,
-          brew_method: brewMethod,
-          rating_overall: ratings.overall,
-          rating_bean_quality: ratings.beanQuality,
-          rating_barista_skill: ratings.baristaSkill,
-          rating_ambiance: ratings.ambiance,
-          notes: notes || null,
-          bean_ids: selectedBeanIds,
-        }),
-      });
-      const json = (await res.json()) as { error?: string };
-      if (!res.ok || json.error) {
-        setFormError(json.error ?? "保存失败，请重试");
-        return;
-      }
-      router.push(initial ? `/visits/${initial.id}` : "/visits");
+      router.push(`/visits/${targetVisitId}`);
     } catch {
       setFormError("保存失败，请检查网络后重试。");
     } finally {
@@ -252,21 +424,67 @@ export function VisitForm({ initial }: VisitFormProps) {
       <div className={cardClass}>
         <h2 className={headingClass}>品尝的咖啡豆</h2>
         <div className="flex flex-wrap gap-2 mb-4">
-          {beans.map((bean) => (
-            <button key={bean.id} type="button" data-testid="log-bean-chip" onClick={() => toggleBean(bean.id)}
-              className={`text-xs px-3 py-1.5 rounded-full transition-colors ${
-                selectedBeanIds.includes(bean.id) ? "bg-sage text-cream" : "bg-cream-dark text-warm-gray hover:bg-cream-dark/80"
-              }`}>
-              {bean.name}
-            </button>
-          ))}
+          {beans.map((bean) => {
+            const selected = selectedBeanIds.includes(bean.id);
+            const owned = currentUserId != null && bean.user_id === currentUserId;
+            return (
+              <span key={bean.id} className="inline-flex items-center gap-0.5">
+                <button type="button" data-testid="log-bean-chip" onClick={() => toggleBean(bean.id)}
+                  className={`text-xs px-3 py-1.5 rounded-full transition-colors ${
+                    selected ? "bg-sage text-cream" : "bg-cream-dark text-warm-gray hover:bg-cream-dark/80"
+                  }`}>
+                  {bean.name}
+                </button>
+                {owned && (
+                  <>
+                    <button type="button" data-testid="log-bean-edit" title="编辑咖啡豆"
+                      aria-label={`编辑 ${bean.name}`} onClick={() => startBeanEdit(bean.id)}
+                      className="px-1 text-xs text-warm-gray/60 hover:text-espresso transition-colors">
+                      ✎
+                    </button>
+                    <button type="button" data-testid="log-bean-delete" title="删除咖啡豆"
+                      aria-label={`删除 ${bean.name}`} onClick={() => handleBeanDelete(bean)}
+                      className="px-1 text-xs text-warm-gray/60 hover:text-red-600 transition-colors">
+                      ✕
+                    </button>
+                  </>
+                )}
+              </span>
+            );
+          })}
         </div>
-        {!showNewBean ? (
-          <button type="button" data-testid="log-add-new-bean" onClick={() => setShowNewBean(true)} className="text-sm text-terracotta hover:underline">
+        {beanActionError && (
+          <div data-testid="log-bean-action-error" className="mb-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+            {beanActionError}
+          </div>
+        )}
+        {editingBeanId != null ? (
+          <BeanForm
+            key={editingBeanId}
+            initial={beans.find((b) => b.id === editingBeanId)}
+            initialPhotos={editingBeanPhotos}
+            submitLabel="保存修改"
+            showPhotos
+            currentUserId={currentUserId}
+            testIdPrefix="bean-edit"
+            onSubmit={updateBeanFields}
+            onComplete={onBeanUpdated}
+            onCancel={() => setEditingBeanId(null)}
+          />
+        ) : !showNewBean ? (
+          <button type="button" data-testid="log-add-new-bean" onClick={() => { setShowNewBean(true); setBeanActionError(""); }} className="text-sm text-terracotta hover:underline">
             + 添加新豆
           </button>
         ) : (
-          <NewBeanForm onCreated={handleBeanCreated} onCancel={() => setShowNewBean(false)} />
+          <BeanForm
+            submitLabel="保存豆子"
+            showPhotos
+            currentUserId={currentUserId}
+            testIdPrefix="new-bean"
+            onSubmit={createBeanFields}
+            onComplete={onBeanCreated}
+            onCancel={() => setShowNewBean(false)}
+          />
         )}
       </div>
 
@@ -284,6 +502,22 @@ export function VisitForm({ initial }: VisitFormProps) {
         <label className="block text-sm font-medium text-espresso mb-2">备注</label>
         <textarea data-testid="log-notes" value={notes} onChange={(e) => setNotes(e.target.value)}
           placeholder="这次体验如何？有什么亮点？" rows={4} className={`${inputClass} resize-none`} />
+      </div>
+
+      <div className={cardClass}>
+        <h2 className={headingClass}>照片</h2>
+        {initial && initialPhotos && initialPhotos.length > 0 && (
+          <div className="mb-4">
+            <PhotoGallery photos={initialPhotos} currentUserId={currentUserId} />
+          </div>
+        )}
+        <PhotoStager
+          staged={stagedPhotos}
+          onAddFiles={handleAddFiles}
+          onRemove={handleRemoveStaged}
+          onCaptionChange={handleCaptionChange}
+          disabled={submitting}
+        />
       </div>
 
       {formError && (

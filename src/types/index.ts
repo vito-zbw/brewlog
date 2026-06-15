@@ -180,6 +180,9 @@ export interface NewBeanInput {
   user_id: number;
 }
 
+/** Fields editable on an existing bean (ownership/user_id never changes). */
+export type UpdateBeanInput = Omit<NewBeanInput, "user_id">;
+
 export interface NewCafeInput {
   name: string;
   city: string;

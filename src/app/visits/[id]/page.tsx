@@ -5,7 +5,6 @@ import { getVisitWithBeans, listPhotos } from "@/lib/queries";
 import { BREW_METHODS, formatVisitDate, optionLabel } from "@/lib/terms";
 import { RatingBeans } from "@/components/RatingBeans";
 import { PhotoGallery } from "@/components/PhotoGallery";
-import { PhotoUpload } from "@/components/PhotoUpload";
 import { ShareLinkButton } from "@/components/ShareLinkButton";
 
 export const dynamic = "force-dynamic";
@@ -139,8 +138,8 @@ export default async function VisitDetailPage({
         照片
       </h2>
       <div className="space-y-4">
-        {isOwner && <PhotoUpload entityType="visit" entityId={visitId} />}
-        <PhotoGallery photos={photos} currentUserId={session?.user?.id ?? null} />
+        {/* Photos are managed from the edit form now; the detail page is view-only. */}
+        <PhotoGallery photos={photos} canDelete={false} />
       </div>
     </div>
   );

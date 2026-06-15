@@ -4,7 +4,6 @@ import { auth } from "@/auth";
 import { getBeanWithVisits, listPhotos } from "@/lib/queries";
 import { PROCESSING_METHODS, ROAST_LEVELS, optionLabel } from "@/lib/terms";
 import { PhotoGallery } from "@/components/PhotoGallery";
-import { PhotoUpload } from "@/components/PhotoUpload";
 import { ShareLinkButton } from "@/components/ShareLinkButton";
 import { VisitCard } from "@/components/VisitCard";
 
@@ -57,7 +56,18 @@ export default async function BeanDetailPage({
           <h1 className="text-3xl font-bold font-[Playfair_Display] text-espresso">
             {bean.name}
           </h1>
-          <ShareLinkButton />
+          <div className="flex items-center gap-2 shrink-0">
+            <ShareLinkButton />
+            {isOwner && (
+              <Link
+                data-testid="bean-edit-link"
+                href={`/beans/${bean.id}/edit`}
+                className="px-3 py-1.5 border border-cream-dark rounded-lg text-sm text-espresso hover:bg-cream transition-colors"
+              >
+                编辑
+              </Link>
+            )}
+          </div>
         </div>
         <p
           className={`text-warm-gray text-lg ${
@@ -144,8 +154,8 @@ export default async function BeanDetailPage({
           <h2 className="text-xs text-warm-gray/70 uppercase tracking-wider mb-2">
             照片
           </h2>
-          {isOwner && <PhotoUpload entityType="bean" entityId={bean.id} />}
-          <PhotoGallery photos={photos} currentUserId={session?.user?.id ?? null} />
+          {/* Photos are managed from the edit form now; detail page is view-only. */}
+          <PhotoGallery photos={photos} canDelete={false} />
         </div>
       </div>
 

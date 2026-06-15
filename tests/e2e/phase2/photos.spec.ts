@@ -27,23 +27,40 @@ async function uploadPhoto(page: Page, path: string): Promise<string> {
 }
 
 test.describe("photos", () => {
-  test("uploads a photo on a visit detail page and serves it back", async ({
+  test("attaches a photo to a visit via the edit form and serves it back", async ({
     page,
   }) => {
     await page.goto("/visits/1");
     await expect(page.getByTestId("visit-detail")).toBeVisible();
+    // The inline uploader is gone — photos are managed through the edit form.
+    await expect(page.getByTestId("photo-upload-input")).toHaveCount(0);
 
-    const src = await uploadPhoto(page, "/visits/1");
+    const gallery = page.getByTestId("gallery-image");
+    const before = await gallery.count();
+
+    await page.getByTestId("visit-edit-link").click();
+    await expect(page).toHaveURL("/visits/1/edit");
+    await page.getByTestId("photo-stager-input").setInputFiles(FIXTURE);
+    await expect(page.getByTestId("staged-photo")).toHaveCount(1);
+    await page.getByTestId("log-submit").click();
+
+    await expect(page).toHaveURL("/visits/1");
+    await expect.poll(() => gallery.count()).toBeGreaterThan(before);
+
+    const src = await gallery.first().getAttribute("src");
     expect(src).toMatch(/^\/api\/uploads\//);
-
-    const response = await page.request.get(src);
+    const response = await page.request.get(src ?? "");
     expect(response.status()).toBe(200);
     expect(response.headers()["content-type"] ?? "").toMatch(/^image\//);
   });
 
-  test("uploads a photo on a bean detail page", async ({ page }) => {
-    const src = await uploadPhoto(page, "/beans/1");
-    expect(src).toMatch(/^\/api\/uploads\//);
+  test("bean detail page is view-only (photos managed in the edit form)", async ({
+    page,
+  }) => {
+    await page.goto("/beans/1");
+    await expect(page.getByText("处理法", { exact: true })).toBeVisible();
+    // Mirrors visits: the inline uploader is gone; photos move to the edit form.
+    await expect(page.getByTestId("photo-upload-input")).toHaveCount(0);
   });
 
   test("photos persist across a full page reload", async ({ page }) => {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { listBeans, createBean } from "@/lib/queries";
-import { PROCESSING_METHODS, ROAST_LEVELS } from "@/lib/terms";
+import { validateBeanBody } from "@/lib/bean-validation";
 import { requireUserId, UnauthorizedError } from "@/lib/auth-helpers";
 
 export async function GET(request: NextRequest) {
@@ -26,22 +26,9 @@ export async function POST(request: NextRequest) {
     if (!body) {
       return NextResponse.json({ error: "请求格式错误" }, { status: 400 });
     }
-    if (!body.name || !body.origin_country) {
-      return NextResponse.json(
-        { error: "豆名和产地国家为必填项" },
-        { status: 400 }
-      );
-    }
-    if (
-      (body.processing_method != null &&
-        !PROCESSING_METHODS.some((o) => o.value === body.processing_method)) ||
-      (body.roast_level != null &&
-        !ROAST_LEVELS.some((o) => o.value === body.roast_level))
-    ) {
-      return NextResponse.json(
-        { error: "处理法或烘焙度无效" },
-        { status: 400 }
-      );
+    const invalid = validateBeanBody(body);
+    if (invalid) {
+      return NextResponse.json({ error: invalid }, { status: 400 });
     }
     const bean = await createBean({ ...body, user_id: userId });
     return NextResponse.json({ data: bean }, { status: 201 });

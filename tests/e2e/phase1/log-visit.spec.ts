@@ -100,17 +100,15 @@ test.describe("log a visit", () => {
     await page.getByTestId("log-notes").fill(notesText);
     await page.getByTestId("log-submit").click();
 
-    // Submit creates the café, then the visit, then redirects to the feed.
-    await expect(page).toHaveURL("/visits");
-
-    // The visit defaults to today's date — newer than every seed visit and
-    // inserted after anything earlier specs created, so it must be first.
-    const firstCard = page.getByTestId("visit-card").first();
-    await expect(firstCard).toContainText(cafeName);
-    await expect(firstCard).toContainText("冷萃 Cold Brew");
-    await expect(firstCard).toContainText(beanName);
-    await expect(firstCard).toContainText(notesText);
-    await expect(firstCard).toContainText("Baiwei 记录");
+    // Submit creates the café, then the visit, then redirects to the new
+    // visit's detail page (was the feed before photos-in-log).
+    await expect(page).toHaveURL(/\/visits\/\d+$/);
+    const detail = page.getByTestId("visit-detail");
+    await expect(detail).toContainText(cafeName);
+    await expect(detail).toContainText("冷萃 Cold Brew");
+    await expect(detail).toContainText(beanName);
+    await expect(detail).toContainText(notesText);
+    await expect(detail).toContainText("Baiwei 记录");
   });
 
   test("created café is returned by GET /api/cafes with the submitted fields", async ({
