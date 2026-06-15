@@ -54,9 +54,13 @@ test.describe("photos", () => {
     expect(response.headers()["content-type"] ?? "").toMatch(/^image\//);
   });
 
-  test("uploads a photo on a bean detail page", async ({ page }) => {
-    const src = await uploadPhoto(page, "/beans/1");
-    expect(src).toMatch(/^\/api\/uploads\//);
+  test("bean detail page is view-only (photos managed in the edit form)", async ({
+    page,
+  }) => {
+    await page.goto("/beans/1");
+    await expect(page.getByText("处理法", { exact: true })).toBeVisible();
+    // Mirrors visits: the inline uploader is gone; photos move to the edit form.
+    await expect(page.getByTestId("photo-upload-input")).toHaveCount(0);
   });
 
   test("photos persist across a full page reload", async ({ page }) => {

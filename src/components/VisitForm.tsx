@@ -71,8 +71,8 @@ export function VisitForm({
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
   const [editingBeanId, setEditingBeanId] = useState<number | null>(null);
+  const [editingBeanPhotos, setEditingBeanPhotos] = useState<Photo[]>([]);
   const [beanActionError, setBeanActionError] = useState("");
-  const [beanNotice, setBeanNotice] = useState("");
 
   const [cafeId, setCafeId] = useState(initial ? String(initial.cafe_id) : "");
   const [isNewCafe, setIsNewCafe] = useState(false);
@@ -124,13 +124,10 @@ export function VisitForm({
     setSelectedBeanIds((prev) => (prev.includes(id) ? prev.filter((b) => b !== id) : [...prev, id]));
   };
 
-  // Inline create. The bean POST must succeed (errors surface in BeanForm);
-  // the optional photo is best-effort — the bean is already saved, so a failed
-  // upload only sets a notice and never blocks selecting the bean.
-  const handleBeanCreate = async (
-    payload: UpdateBeanInput,
-    photoFile: File | null
-  ) => {
+  // Inline create/edit: BeanForm owns the staged-photo upload + retry; these
+  // just save the bean's fields and return the saved bean (mirrors how the
+  // visit form itself stages photos and uploads after the row exists).
+  const createBeanFields = async (payload: UpdateBeanInput): Promise<Bean> => {
     const res = await fetch("/api/beans", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -140,22 +137,19 @@ export function VisitForm({
     if (!res.ok || !json.data) {
       throw new Error(json.error ?? "保存失败，请重试");
     }
-    const bean = json.data;
-    if (photoFile) {
-      try {
-        await uploadEntityPhoto("bean", bean.id, photoFile);
-        setBeanNotice("");
-      } catch {
-        setBeanNotice("咖啡豆已保存，但照片上传失败。可稍后在咖啡豆详情页补充。");
-      }
-    }
+    return json.data;
+  };
+
+  const onBeanCreated = (bean: Bean) => {
     setBeans((prev) => [bean, ...prev]);
     setSelectedBeanIds((prev) => [...prev, bean.id]);
     setShowNewBean(false);
   };
 
-  const handleBeanUpdate = async (payload: UpdateBeanInput) => {
-    if (editingBeanId == null) return;
+  const updateBeanFields = async (
+    payload: UpdateBeanInput
+  ): Promise<Bean> => {
+    // editingBeanId is always set while the inline edit form is rendered.
     const res = await fetch(`/api/beans/${editingBeanId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -165,8 +159,11 @@ export function VisitForm({
     if (!res.ok || !json.data) {
       throw new Error(json.error ?? "保存失败，请重试");
     }
-    const updated = json.data;
-    setBeans((prev) => prev.map((b) => (b.id === updated.id ? updated : b)));
+    return json.data;
+  };
+
+  const onBeanUpdated = (bean: Bean) => {
+    setBeans((prev) => prev.map((b) => (b.id === bean.id ? bean : b)));
     setEditingBeanId(null);
   };
 
@@ -192,10 +189,23 @@ export function VisitForm({
     }
   };
 
-  const startBeanEdit = (id: number) => {
-    setEditingBeanId(id);
+  const startBeanEdit = async (id: number) => {
     setShowNewBean(false);
     setBeanActionError("");
+    // Load the bean's existing photos so the inline editor can manage them.
+    // Fetched before opening so BeanForm mounts with them ready (it seeds its
+    // existing-photo state from the prop on mount).
+    let photos: Photo[] = [];
+    try {
+      const res = await fetch(
+        `/api/photos?entity_type=bean&entity_id=${id}`
+      );
+      if (res.ok) photos = ((await res.json()) as { data?: Photo[] }).data ?? [];
+    } catch {
+      // Non-fatal — open the editor without the existing gallery.
+    }
+    setEditingBeanPhotos(photos);
+    setEditingBeanId(id);
   };
 
   const handleAddFiles = (files: File[]) => {
@@ -448,18 +458,17 @@ export function VisitForm({
             {beanActionError}
           </div>
         )}
-        {beanNotice && (
-          <div data-testid="log-bean-notice" className="mb-3 text-sm text-espresso bg-cream-dark/40 border border-cream-dark rounded-lg px-3 py-2">
-            {beanNotice}
-          </div>
-        )}
         {editingBeanId != null ? (
           <BeanForm
             key={editingBeanId}
             initial={beans.find((b) => b.id === editingBeanId)}
+            initialPhotos={editingBeanPhotos}
             submitLabel="保存修改"
+            showPhotos
+            currentUserId={currentUserId}
             testIdPrefix="bean-edit"
-            onSubmit={handleBeanUpdate}
+            onSubmit={updateBeanFields}
+            onComplete={onBeanUpdated}
             onCancel={() => setEditingBeanId(null)}
           />
         ) : !showNewBean ? (
@@ -469,9 +478,11 @@ export function VisitForm({
         ) : (
           <BeanForm
             submitLabel="保存豆子"
-            showPhotoPicker
+            showPhotos
+            currentUserId={currentUserId}
             testIdPrefix="new-bean"
-            onSubmit={handleBeanCreate}
+            onSubmit={createBeanFields}
+            onComplete={onBeanCreated}
             onCancel={() => setShowNewBean(false)}
           />
         )}

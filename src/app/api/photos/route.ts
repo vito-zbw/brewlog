@@ -1,11 +1,39 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createPhoto, entityExists, getEntityOwner } from "@/lib/queries";
+import {
+  createPhoto,
+  entityExists,
+  getEntityOwner,
+  listPhotos,
+} from "@/lib/queries";
 import { isSupportedImageType, savePhoto } from "@/lib/storage";
 import { requireUserId, UnauthorizedError } from "@/lib/auth-helpers";
 import type { PhotoEntityType } from "@/types";
 
 const MAX_BYTES = 4 * 1024 * 1024; // client downscales first; Vercel caps bodies at ~4.5MB
 const ENTITY_TYPES: PhotoEntityType[] = ["bean", "cafe", "visit"];
+
+// Public read: list an entity's photos. Used by client forms (e.g. inline bean
+// editing) that need a fresh photo list without a full server render.
+export async function GET(request: NextRequest) {
+  try {
+    const params = request.nextUrl.searchParams;
+    const entityType = params.get("entity_type");
+    const entityId = Number(params.get("entity_id"));
+    if (
+      !entityType ||
+      !ENTITY_TYPES.includes(entityType as PhotoEntityType) ||
+      !Number.isInteger(entityId) ||
+      entityId <= 0
+    ) {
+      return NextResponse.json({ error: "参数无效" }, { status: 400 });
+    }
+    const photos = await listPhotos(entityType as PhotoEntityType, entityId);
+    return NextResponse.json({ data: photos });
+  } catch (err) {
+    console.error("GET /api/photos failed:", err);
+    return NextResponse.json({ error: "加载照片失败" }, { status: 500 });
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {

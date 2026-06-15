@@ -1,10 +1,12 @@
+import { readFileSync } from "node:fs";
 import { test, expect } from "../../helpers/fixtures";
 import type { APIRequestContext } from "@playwright/test";
 
-// Full bean lifecycle: create (all fields + photo) in the log form, owner-gated
-// edit & delete, and the "block delete while a visit uses it" rule. Default
-// session is Baiwei (user1); non-owner blocks switch to Friend2 (user2.json) or
-// logged-out. Every test creates uniquely-named rows so seed data stays intact.
+// Full bean lifecycle, aligned with the visit-photo model: photos are STAGED in
+// the create/edit forms and uploaded after the bean row exists; the detail page
+// is view-only; delete lives in the edit form. Default session is Baiwei
+// (user1); non-owner blocks switch to Friend2 (user2.json) or logged-out. Every
+// test creates uniquely-named rows so seed data stays intact.
 
 const FIXTURE = "tests/fixtures/test-photo.jpg";
 const BAIWEI_BEAN_ID = 1; // seed bean "云南保山铁皮卡", owned by user1 (Baiwei).
@@ -57,8 +59,39 @@ async function createVisitWithBean(
   return ((await res.json()) as VisitBody).data.id;
 }
 
+/** Uploads one photo to a bean (owned by the request) via the API. */
+async function uploadBeanPhoto(
+  request: APIRequestContext,
+  beanId: number
+): Promise<void> {
+  const res = await request.post("/api/photos", {
+    multipart: {
+      file: {
+        name: "photo.jpg",
+        mimeType: "image/jpeg",
+        buffer: readFileSync(FIXTURE),
+      },
+      entity_type: "bean",
+      entity_id: String(beanId),
+    },
+  });
+  expect(res.status()).toBe(201);
+}
+
+async function beanIdByName(
+  request: APIRequestContext,
+  name: string
+): Promise<number> {
+  const res = await request.get(
+    `/api/beans?search=${encodeURIComponent(name)}`
+  );
+  const beans = ((await res.json()) as { data: { id: number }[] }).data;
+  expect(beans.length).toBe(1);
+  return beans[0].id;
+}
+
 test.describe("咖啡豆 创建 — 完整字段 + 照片（log 表单）", () => {
-  test("creates a bean with every card field and a photo, then renders them", async ({
+  test("creates a bean with every card field and staged photos, then renders them", async ({
     page,
     request,
   }) => {
@@ -67,8 +100,7 @@ test.describe("咖啡豆 创建 — 完整字段 + 照片（log 表单）", () =
     const freetext = `这是一段独一无二的风味描述 ${Date.now()}`;
 
     await page.goto("/log");
-    // Wait for the client fetch to populate chips — proves the page hydrated
-    // before we click (mirrors log-visit.spec), avoiding a hydration race.
+    // Wait for the client fetch to populate chips — proves the page hydrated.
     await expect(page.getByTestId("log-bean-chip").first()).toBeVisible();
     await page.getByTestId("log-add-new-bean").click();
 
@@ -80,10 +112,14 @@ test.describe("咖啡豆 创建 — 完整字段 + 照片（log 表单）", () =
     await page.getByTestId("new-bean-processing").selectOption("Natural");
     await page.getByTestId("new-bean-roast").selectOption("Medium-Light");
     await page.getByTestId("new-bean-freetext").fill(freetext);
-    // Pick a flavor tag (first one) and attach a photo before saving.
     await page.getByTestId("flavor-tag").first().click();
-    await page.getByTestId("new-bean-photo-input").setInputFiles(FIXTURE);
-    await expect(page.getByTestId("new-bean-photo-name")).toBeVisible();
+
+    // Stage two photos with a caption on the first (aligned with the visit form).
+    await page
+      .getByTestId("new-bean-photo-stager-input")
+      .setInputFiles([FIXTURE, FIXTURE]);
+    await expect(page.getByTestId("new-bean-staged-photo")).toHaveCount(2);
+    await page.getByTestId("new-bean-staged-photo-caption").first().fill("拉花");
 
     await page.getByTestId("new-bean-save").click();
 
@@ -93,14 +129,7 @@ test.describe("咖啡豆 创建 — 完整字段 + 照片（log 表单）", () =
       page.getByTestId("log-bean-chip").filter({ hasText: name })
     ).toBeVisible();
 
-    // Resolve the new bean's id and verify the detail page shows everything.
-    const found = await request.get(
-      `/api/beans?search=${encodeURIComponent(name)}`
-    );
-    const beans = ((await found.json()) as { data: { id: number }[] }).data;
-    expect(beans.length).toBe(1);
-    const beanId = beans[0].id;
-
+    const beanId = await beanIdByName(request, name);
     await page.goto(`/beans/${beanId}`);
     await expect(page.getByRole("heading", { name })).toBeVisible();
     await expect(page.getByText("庄园", { exact: true })).toBeVisible();
@@ -110,13 +139,13 @@ test.describe("咖啡豆 创建 — 完整字段 + 照片（log 表单）", () =
     await expect(
       page.getByText("中浅烘 Medium-Light", { exact: true })
     ).toBeVisible();
-    // The attached photo made it into the gallery.
     await expect
       .poll(() => page.getByTestId("gallery-image").count())
-      .toBeGreaterThanOrEqual(1);
+      .toBe(2);
+    await expect(page.getByText("拉花")).toBeVisible();
   });
 
-  test("bean is still saved when the photo upload fails (best-effort)", async ({
+  test("a failed photo upload keeps the form; retry succeeds without duplicating the bean", async ({
     page,
     request,
   }) => {
@@ -127,24 +156,42 @@ test.describe("咖啡豆 创建 — 完整字段 + 照片（log 表单）", () =
     await page.getByTestId("log-add-new-bean").click();
     await page.getByTestId("new-bean-name").fill(name);
     await page.getByTestId("new-bean-origin").fill("埃塞俄比亚");
+    await page.getByTestId("new-bean-photo-stager-input").setInputFiles(FIXTURE);
+    await expect(page.getByTestId("new-bean-staged-photo")).toHaveCount(1);
 
-    // Make only the photo upload fail; bean creation (/api/beans) still works.
-    await page.route("**/api/photos", (route) => route.abort());
-    await page.getByTestId("new-bean-photo-input").setInputFiles(FIXTURE);
+    // Force only the photo endpoint to fail on the first attempt.
+    await page.route("**/api/photos", (route) =>
+      route.fulfill({
+        status: 500,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "boom" }),
+      })
+    );
     await page.getByTestId("new-bean-save").click();
 
-    // Notice shown, and the bean was created + selected despite the photo error.
-    await expect(page.getByTestId("log-bean-notice")).toContainText(
+    // Bean saved, but we stay on the form: error shown, photo still staged,
+    // and the chip is NOT added yet (onComplete withheld until photos land).
+    await expect(page.getByTestId("new-bean-error")).toContainText(
       "照片上传失败"
     );
+    await expect(page.getByTestId("new-bean-staged-photo")).toHaveCount(1);
+    await expect(
+      page.getByTestId("log-bean-chip").filter({ hasText: name })
+    ).toHaveCount(0);
+
+    // Let uploads through and retry — the guard skips re-creating the bean.
+    await page.unroute("**/api/photos");
+    await page.getByTestId("new-bean-save").click();
     await expect(
       page.getByTestId("log-bean-chip").filter({ hasText: name })
     ).toBeVisible();
 
-    const found = await request.get(
-      `/api/beans?search=${encodeURIComponent(name)}`
-    );
-    expect(((await found.json()) as { data: unknown[] }).data.length).toBe(1);
+    // Exactly one bean with this name (no duplicate from the retry).
+    const beanId = await beanIdByName(request, name);
+    await page.goto(`/beans/${beanId}`);
+    await expect
+      .poll(() => page.getByTestId("gallery-image").count())
+      .toBe(1);
   });
 });
 
@@ -195,7 +242,91 @@ test.describe("咖啡豆 编辑 — owner", () => {
     await expect(page.getByText(newFarm, { exact: true })).toBeVisible();
   });
 
-  test("inline edit & delete controls appear for owned bean chips in the log form", async ({
+  test("edit page stages a new photo and it shows on the detail page", async ({
+    page,
+    request,
+  }) => {
+    const { id } = await createBean(request);
+
+    await page.goto(`/beans/${id}/edit`);
+    await page.getByTestId("bean-edit-photo-stager-input").setInputFiles(FIXTURE);
+    await expect(page.getByTestId("bean-edit-staged-photo")).toHaveCount(1);
+    await page.getByTestId("bean-edit-save").click();
+
+    await expect(page).toHaveURL(`/beans/${id}`);
+    await expect
+      .poll(() => page.getByTestId("gallery-image").count())
+      .toBe(1);
+  });
+
+  test("edit page deletes an existing photo", async ({ page, request }) => {
+    const { id } = await createBean(request);
+    await uploadBeanPhoto(request, id);
+
+    await page.goto(`/beans/${id}/edit`);
+    await expect(page.getByTestId("bean-edit-existing-photo")).toHaveCount(1);
+
+    page.on("dialog", (dialog) => dialog.accept());
+    await page.getByTestId("bean-edit-existing-photo-delete").click();
+    await expect(page.getByTestId("bean-edit-existing-photo")).toHaveCount(0);
+
+    // Gone on the detail page too.
+    await page.goto(`/beans/${id}`);
+    await expect(page.getByTestId("gallery-image")).toHaveCount(0);
+  });
+
+  test("inline edit changes an owned bean's field and persists it", async ({
+    page,
+    request,
+  }) => {
+    const { id, name } = await createBean(request);
+    const newFarm = `内联编辑庄园 ${Date.now()}`;
+
+    await page.goto("/log");
+    await expect(
+      page.getByTestId("log-bean-chip").filter({ hasText: name })
+    ).toBeVisible();
+    await page.getByRole("button", { name: `编辑 ${name}` }).click();
+
+    await page.getByTestId("bean-edit-farm").fill(newFarm);
+    await page.getByTestId("bean-edit-save").click();
+
+    // The inline edit form closes once the save resolves.
+    await expect(page.getByTestId("bean-edit-farm")).toHaveCount(0);
+
+    const check = await request.get(`/api/beans/${id}`);
+    const bean = ((await check.json()) as { data: { farm: string } }).data;
+    expect(bean.farm).toBe(newFarm);
+  });
+
+  test("inline edit stages a photo onto an owned bean", async ({
+    page,
+    request,
+  }) => {
+    const { id, name } = await createBean(request);
+
+    await page.goto("/log");
+    await expect(
+      page.getByTestId("log-bean-chip").filter({ hasText: name })
+    ).toBeVisible();
+    await page.getByRole("button", { name: `编辑 ${name}` }).click();
+
+    // Inline editor shows the bean's photo stager (prefixed to avoid clashing
+    // with the visit stager on the same page).
+    await page
+      .getByTestId("bean-edit-photo-stager-input")
+      .setInputFiles(FIXTURE);
+    await expect(page.getByTestId("bean-edit-staged-photo")).toHaveCount(1);
+    await page.getByTestId("bean-edit-save").click();
+    await expect(page.getByTestId("bean-edit-farm")).toHaveCount(0);
+
+    const photos = await request.get(
+      `/api/photos?entity_type=bean&entity_id=${id}`
+    );
+    expect(((await photos.json()) as { data: unknown[] }).data.length).toBe(1);
+  });
+
+  test("inline edit & delete controls appear for owned bean chips", async ({
     page,
     request,
   }) => {
@@ -215,30 +346,6 @@ test.describe("咖啡豆 编辑 — owner", () => {
 
     const check = await request.get(`/api/beans/${id}`);
     expect(check.status()).toBe(404);
-  });
-
-  test("inline edit changes an owned bean's field and persists it", async ({
-    page,
-    request,
-  }) => {
-    const { id, name } = await createBean(request);
-    const newFarm = `内联编辑庄园 ${Date.now()}`;
-
-    await page.goto("/log");
-    await expect(
-      page.getByTestId("log-bean-chip").filter({ hasText: name })
-    ).toBeVisible();
-    await page.getByRole("button", { name: `编辑 ${name}` }).click();
-
-    await page.getByTestId("bean-edit-farm").fill(newFarm);
-    await page.getByTestId("bean-edit-save").click();
-
-    // The inline edit form closes once the PUT resolves.
-    await expect(page.getByTestId("bean-edit-farm")).toHaveCount(0);
-
-    const check = await request.get(`/api/beans/${id}`);
-    const bean = ((await check.json()) as { data: { farm: string } }).data;
-    expect(bean.farm).toBe(newFarm);
   });
 });
 
@@ -266,33 +373,63 @@ test.describe("咖啡豆 删除 — owner", () => {
     expect(check.status()).toBe(200);
   });
 
-  test("delete button on the detail page surfaces the 409 message", async ({
+  test("edit-form delete button removes an unused bean → back to library", async ({
+    page,
+    request,
+  }) => {
+    const { id } = await createBean(request);
+
+    await page.goto(`/beans/${id}/edit`);
+    page.on("dialog", (dialog) => dialog.accept());
+    await page.getByTestId("bean-delete").click();
+
+    await expect(page).toHaveURL("/beans");
+    const check = await request.get(`/api/beans/${id}`);
+    expect(check.status()).toBe(404);
+  });
+
+  test("edit-form delete button surfaces the 409 message when in use", async ({
     page,
     request,
   }) => {
     const { id } = await createBean(request);
     await createVisitWithBean(request, id);
 
-    await page.goto(`/beans/${id}`);
+    await page.goto(`/beans/${id}/edit`);
     page.on("dialog", (dialog) => dialog.accept());
     await page.getByTestId("bean-delete").click();
 
     await expect(page.getByTestId("bean-delete-error")).toContainText(
       "无法删除"
     );
-    // Still on the bean page, not redirected.
-    await expect(page).toHaveURL(`/beans/${id}`);
+    await expect(page).toHaveURL(`/beans/${id}/edit`);
+  });
+});
+
+test.describe("咖啡豆 详情页 — 只读照片", () => {
+  test("detail page has no photo upload control or edit link when logged in as owner", async ({
+    page,
+    request,
+  }) => {
+    const { id } = await createBean(request);
+    await uploadBeanPhoto(request, id);
+
+    await page.goto(`/beans/${id}`);
+    // Owner sees the 编辑 link but NO inline photo management on the detail page.
+    await expect(page.getByTestId("bean-edit-link")).toBeVisible();
+    await expect(page.getByTestId("photo-stager-input")).toHaveCount(0);
+    await expect(page.getByTestId("photo-delete-button")).toHaveCount(0);
+    await expect(page.getByTestId("gallery-image")).toHaveCount(1);
   });
 });
 
 test.describe("咖啡豆 编辑/删除 — logged out", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
-  test("no 编辑/删除 controls on a bean detail page", async ({ page }) => {
+  test("no 编辑 link on a bean detail page", async ({ page }) => {
     await page.goto(`/beans/${BAIWEI_BEAN_ID}`);
     await expect(page.getByText("处理法", { exact: true })).toBeVisible();
     await expect(page.getByTestId("bean-edit-link")).toHaveCount(0);
-    await expect(page.getByTestId("bean-delete")).toHaveCount(0);
   });
 
   test("PUT and DELETE return 401, bean intact", async ({ request }) => {
@@ -315,11 +452,10 @@ test.describe("咖啡豆 编辑/删除 — logged out", () => {
 test.describe("咖啡豆 编辑/删除 — non-owner (Friend2)", () => {
   test.use({ storageState: "playwright/.auth/user2.json" });
 
-  test("no 编辑/删除 controls on someone else's bean", async ({ page }) => {
+  test("no 编辑 link on someone else's bean", async ({ page }) => {
     await page.goto(`/beans/${BAIWEI_BEAN_ID}`);
     await expect(page.getByText("处理法", { exact: true })).toBeVisible();
     await expect(page.getByTestId("bean-edit-link")).toHaveCount(0);
-    await expect(page.getByTestId("bean-delete")).toHaveCount(0);
   });
 
   test("PUT and DELETE another user's bean return 403, bean intact", async ({

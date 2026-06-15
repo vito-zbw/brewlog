@@ -19,6 +19,11 @@ interface PhotoStagerProps {
   onRemove: (id: string) => void;
   onCaptionChange: (id: string, caption: string) => void;
   disabled?: boolean;
+  /**
+   * Prefixes every data-testid so multiple stagers can share a page (e.g. a bean
+   * stager and the visit stager on /log). Omit to keep the default ids.
+   */
+  testIdPrefix?: string;
 }
 
 export function PhotoStager({
@@ -27,7 +32,10 @@ export function PhotoStager({
   onRemove,
   onCaptionChange,
   disabled,
+  testIdPrefix,
 }: PhotoStagerProps) {
+  const tid = (name: string) =>
+    testIdPrefix ? `${testIdPrefix}-${name}` : name;
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     const input = e.target;
     const picked = Array.from(input.files ?? []).filter((f) =>
@@ -52,7 +60,7 @@ export function PhotoStager({
           type="file"
           accept={ACCEPT}
           multiple
-          data-testid="photo-stager-input"
+          data-testid={tid("photo-stager-input")}
           className="hidden"
           disabled={disabled}
           onChange={handleChange}
@@ -62,7 +70,7 @@ export function PhotoStager({
       {staged.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {staged.map((photo) => (
-            <div key={photo.id} data-testid="staged-photo" className="relative">
+            <div key={photo.id} data-testid={tid("staged-photo")} className="relative">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={photo.previewUrl}
@@ -74,7 +82,7 @@ export function PhotoStager({
                 onClick={() => onRemove(photo.id)}
                 disabled={disabled}
                 aria-label="移除照片"
-                data-testid="staged-photo-remove"
+                data-testid={tid("staged-photo-remove")}
                 className="absolute top-1.5 right-1.5 h-6 w-6 rounded-full bg-espresso/60 text-cream text-xs leading-none hover:bg-espresso transition-colors disabled:opacity-50"
               >
                 ✕
@@ -84,7 +92,7 @@ export function PhotoStager({
                 value={photo.caption}
                 onChange={(e) => onCaptionChange(photo.id, e.target.value)}
                 placeholder="照片说明（选填）"
-                data-testid="staged-photo-caption"
+                data-testid={tid("staged-photo-caption")}
                 disabled={disabled}
                 className="mt-1 w-full px-2 py-1 text-xs border border-cream-dark rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-terracotta/30"
               />

@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/auth";
-import { getBean } from "@/lib/queries";
+import { getBean, listPhotos } from "@/lib/queries";
 import { BeanEditForm } from "@/components/BeanEditForm";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +33,8 @@ export default async function EditBeanPage({
     notFound();
   }
 
+  const photos = await listPhotos("bean", bean.id);
+
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <Link
@@ -44,7 +46,7 @@ export default async function EditBeanPage({
       <h1 className="text-3xl font-bold font-[Playfair_Display] text-espresso mb-6">
         编辑咖啡豆
       </h1>
-      <BeanEditForm bean={bean} />
+      <BeanEditForm bean={bean} photos={photos} currentUserId={userId} />
     </div>
   );
 }

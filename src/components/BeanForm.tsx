@@ -1,20 +1,28 @@
 "use client";
 
-import { useState, type ChangeEvent } from "react";
-import type { Bean, UpdateBeanInput } from "@/types";
+import { useEffect, useRef, useState } from "react";
+import type { Bean, Photo, UpdateBeanInput } from "@/types";
 import { PROCESSING_METHODS, ROAST_LEVELS } from "@/lib/terms";
 import { FlavorTagPicker } from "@/components/FlavorTagPicker";
+import { PhotoStager, type StagedPhoto } from "@/components/PhotoStager";
+import { uploadEntityPhoto } from "@/lib/image-client";
 
 interface BeanFormProps {
   /** Existing bean to prefill (edit mode); omit for a blank create form. */
   initial?: Bean;
+  /** Existing photos to show with delete (edit contexts). */
+  initialPhotos?: Photo[];
   submitLabel: string;
-  /** Show the single-photo picker (inline create only). */
-  showPhotoPicker?: boolean;
-  /** Prefix for field data-testids so multiple instances stay addressable. */
+  /** Render the photo section (existing gallery + stager). */
+  showPhotos?: boolean;
+  /** Current user id — gates delete on existing photos. */
+  currentUserId?: number | null;
+  /** Prefix for field/photo data-testids so multiple instances stay addressable. */
   testIdPrefix?: string;
-  /** Persist the bean. Throw an Error (its message is shown) to signal failure. */
-  onSubmit: (payload: UpdateBeanInput, photoFile: File | null) => Promise<void>;
+  /** Save the bean's fields and return the saved bean. Throw to show an error. */
+  onSubmit: (payload: UpdateBeanInput) => Promise<Bean>;
+  /** Called after fields are saved AND all staged photos uploaded. */
+  onComplete: (bean: Bean) => void;
   onCancel?: () => void;
 }
 
@@ -32,10 +40,13 @@ function splitTags(value: string | null | undefined): string[] {
 
 export function BeanForm({
   initial,
+  initialPhotos,
   submitLabel,
-  showPhotoPicker = false,
+  showPhotos = false,
+  currentUserId = null,
   testIdPrefix = "new-bean",
   onSubmit,
+  onComplete,
   onCancel,
 }: BeanFormProps) {
   const [name, setName] = useState(initial?.name ?? "");
@@ -53,12 +64,84 @@ export function BeanForm({
   const [freetext, setFreetext] = useState(
     initial?.tasting_notes_freetext ?? ""
   );
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
+
+  const [existingPhotos, setExistingPhotos] = useState<Photo[]>(
+    initialPhotos ?? []
+  );
+  const [stagedPhotos, setStagedPhotos] = useState<StagedPhoto[]>([]);
+  // Set once the bean row exists, so a photo-upload retry never re-creates it.
+  const [createdBean, setCreatedBean] = useState<Bean | null>(null);
+  const stagedIdRef = useRef(0);
+  const stagedRef = useRef<StagedPhoto[]>([]);
+  stagedRef.current = stagedPhotos;
+
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const handlePhotoChange = (e: ChangeEvent<HTMLInputElement>) => {
-    setPhotoFile(e.target.files?.[0] ?? null);
+  // Free any outstanding object URLs when the form unmounts.
+  useEffect(() => {
+    return () => {
+      for (const p of stagedRef.current) URL.revokeObjectURL(p.previewUrl);
+    };
+  }, []);
+
+  const handleAddFiles = (files: File[]) => {
+    setStagedPhotos((prev) => [
+      ...prev,
+      ...files.map((file) => ({
+        id: `staged-${stagedIdRef.current++}`,
+        file,
+        previewUrl: URL.createObjectURL(file),
+        caption: "",
+      })),
+    ]);
+  };
+
+  const handleRemoveStaged = (id: string) => {
+    setStagedPhotos((prev) => {
+      const target = prev.find((p) => p.id === id);
+      if (target) URL.revokeObjectURL(target.previewUrl);
+      return prev.filter((p) => p.id !== id);
+    });
+  };
+
+  const handleCaptionChange = (id: string, caption: string) => {
+    setStagedPhotos((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, caption } : p))
+    );
+  };
+
+  const handleDeleteExisting = async (photoId: number) => {
+    if (!window.confirm("确定删除这张照片吗？此操作不可撤销。")) return;
+    try {
+      const res = await fetch(`/api/photos/${photoId}`, { method: "DELETE" });
+      if (!res.ok) {
+        const json = (await res.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        setError(json?.error ?? "删除照片失败");
+        return;
+      }
+      setExistingPhotos((prev) => prev.filter((p) => p.id !== photoId));
+    } catch {
+      setError("删除照片失败");
+    }
+  };
+
+  // Uploads every staged photo to the given bean; succeeded ones leave the
+  // staging list (and free their preview). Returns how many failed.
+  const uploadStagedPhotos = async (beanId: number): Promise<number> => {
+    let failed = 0;
+    for (const photo of stagedPhotos) {
+      try {
+        await uploadEntityPhoto("bean", beanId, photo.file, photo.caption);
+        URL.revokeObjectURL(photo.previewUrl);
+        setStagedPhotos((prev) => prev.filter((p) => p.id !== photo.id));
+      } catch {
+        failed++;
+      }
+    }
+    return failed;
   };
 
   const handleSave = async () => {
@@ -69,20 +152,32 @@ export function BeanForm({
     setError("");
     setSaving(true);
     try {
-      await onSubmit(
-        {
-          name: name.trim(),
-          origin_country: origin.trim(),
-          origin_region: region.trim() || null,
-          farm: farm.trim() || null,
-          roaster: roaster.trim() || null,
-          processing_method: processing,
-          roast_level: roastLevel,
-          tasting_notes_tags: tags.join(",") || null,
-          tasting_notes_freetext: freetext.trim() || null,
-        },
-        photoFile
-      );
+      const payload: UpdateBeanInput = {
+        name: name.trim(),
+        origin_country: origin.trim(),
+        origin_region: region.trim() || null,
+        farm: farm.trim() || null,
+        roaster: roaster.trim() || null,
+        processing_method: processing,
+        roast_level: roastLevel,
+        tasting_notes_tags: tags.join(",") || null,
+        tasting_notes_freetext: freetext.trim() || null,
+      };
+      // Create mode: skip the duplicate INSERT on a photo-upload retry. Edit
+      // mode always re-saves fields (PUT is idempotent).
+      let bean: Bean;
+      if (initial == null && createdBean != null) {
+        bean = createdBean;
+      } else {
+        bean = await onSubmit(payload);
+        if (initial == null) setCreatedBean(bean);
+      }
+      const failed = await uploadStagedPhotos(bean.id);
+      if (failed > 0) {
+        setError(`咖啡豆已保存，但有 ${failed} 张照片上传失败，请重试。`);
+        return;
+      }
+      onComplete(bean);
     } catch (err) {
       setError(err instanceof Error ? err.message : "保存失败，请重试");
     } finally {
@@ -176,38 +271,52 @@ export function BeanForm({
           className={`${inputClass} resize-none`}
         />
       </div>
-      {showPhotoPicker && (
+      {showPhotos && (
         <div>
           <p className="text-xs text-warm-gray/70 mb-2">照片（选填）</p>
-          <div className="flex flex-wrap items-center gap-2">
-            <label className="inline-flex items-center px-4 py-2 bg-cream-dark text-warm-gray text-sm rounded-lg cursor-pointer hover:bg-cream-dark/80 transition-colors">
-              选择照片
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                data-testid={`${testIdPrefix}-photo-input`}
-                className="hidden"
-                onChange={handlePhotoChange}
-              />
-            </label>
-            {photoFile && (
-              <span className="flex items-center gap-2 text-xs text-warm-gray">
-                <span
-                  data-testid={`${testIdPrefix}-photo-name`}
-                  className="max-w-40 truncate"
+          {existingPhotos.length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
+              {existingPhotos.map((photo) => (
+                <div
+                  key={photo.id}
+                  data-testid={`${testIdPrefix}-existing-photo`}
+                  className="relative"
                 >
-                  {photoFile.name}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setPhotoFile(null)}
-                  className="text-red-600 hover:underline"
-                >
-                  移除
-                </button>
-              </span>
-            )}
-          </div>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={photo.url}
+                    alt={photo.caption ?? "照片"}
+                    className="rounded-lg object-cover aspect-square w-full"
+                  />
+                  {currentUserId != null &&
+                    currentUserId === photo.user_id && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteExisting(photo.id)}
+                        aria-label="删除照片"
+                        data-testid={`${testIdPrefix}-existing-photo-delete`}
+                        className="absolute top-1.5 right-1.5 h-6 w-6 rounded-full bg-espresso/60 text-cream text-xs leading-none hover:bg-espresso transition-colors"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  {photo.caption && (
+                    <p className="mt-1 text-xs text-warm-gray truncate">
+                      {photo.caption}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          <PhotoStager
+            staged={stagedPhotos}
+            onAddFiles={handleAddFiles}
+            onRemove={handleRemoveStaged}
+            onCaptionChange={handleCaptionChange}
+            disabled={saving}
+            testIdPrefix={testIdPrefix}
+          />
         </div>
       )}
       {error && (
