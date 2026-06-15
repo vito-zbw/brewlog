@@ -5,9 +5,15 @@ interface PhotoGalleryProps {
   photos: Photo[];
   /** Current user's id — delete button appears only on photos they uploaded. */
   currentUserId?: number | null;
+  /** When false, never render delete buttons (view-only). Defaults to true. */
+  canDelete?: boolean;
 }
 
-export function PhotoGallery({ photos, currentUserId }: PhotoGalleryProps) {
+export function PhotoGallery({
+  photos,
+  currentUserId,
+  canDelete = true,
+}: PhotoGalleryProps) {
   if (photos.length === 0) return null;
 
   return (
@@ -24,7 +30,7 @@ export function PhotoGallery({ photos, currentUserId }: PhotoGalleryProps) {
             data-testid="gallery-image"
             className="rounded-lg object-cover aspect-square w-full"
           />
-          {currentUserId != null && currentUserId === photo.user_id && (
+          {canDelete && currentUserId != null && currentUserId === photo.user_id && (
             <PhotoDeleteButton photoId={photo.id} />
           )}
           {photo.caption && (

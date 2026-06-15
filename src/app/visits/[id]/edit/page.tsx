@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { getVisitWithBeans } from "@/lib/queries";
+import { getVisitWithBeans, listPhotos } from "@/lib/queries";
 import { VisitForm } from "@/components/VisitForm";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +32,8 @@ export default async function EditVisitPage({
     notFound();
   }
 
+  const photos = await listPhotos("visit", visitId);
+
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <h1 className="text-3xl font-bold font-[Playfair_Display] text-espresso mb-6">
@@ -39,6 +41,7 @@ export default async function EditVisitPage({
       </h1>
       <VisitForm
         currentUserId={userId}
+        initialPhotos={photos}
         initial={{
           id: visit.id,
           cafe_id: visit.cafe_id,
