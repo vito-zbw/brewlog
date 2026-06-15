@@ -1,29 +1,32 @@
 import { readFileSync } from "node:fs";
-import type { Page } from "@playwright/test";
+import type { APIRequestContext } from "@playwright/test";
 import { test, expect } from "../../helpers/fixtures";
 
 // Path is relative to the repo root, where Playwright (and this Node
 // process) runs from.
 const FIXTURE = "tests/fixtures/test-photo.jpg";
 
-// Uploads the fixture through the hidden file input and waits for the
-// gallery to grow. Returns the src of the first gallery image. Counts are
-// relative (before vs. after) because earlier specs in the serial run may
-// already have attached photos to the same entity.
-async function uploadPhoto(page: Page, path: string): Promise<string> {
-  await page.goto(path);
-  const gallery = page.getByTestId("gallery-image");
-  const before = await gallery.count();
-
-  await page.getByTestId("photo-upload-input").setInputFiles(FIXTURE);
-
-  await expect.poll(() => gallery.count()).toBeGreaterThan(before);
-  await expect(gallery.first()).toBeVisible();
-  await expect(page.getByTestId("photo-upload-error")).toHaveCount(0);
-
-  const src = await gallery.first().getAttribute("src");
-  expect(src).not.toBeNull();
-  return src ?? "";
+// Uploads one photo to an entity via the API and returns its public URL. The
+// inline detail-page uploader has been retired across the app; photos are added
+// through the visit/bean forms or directly via the API.
+async function apiUploadPhoto(
+  request: APIRequestContext,
+  entityType: string,
+  entityId: number
+): Promise<string> {
+  const res = await request.post("/api/photos", {
+    multipart: {
+      file: {
+        name: "photo.jpg",
+        mimeType: "image/jpeg",
+        buffer: readFileSync(FIXTURE),
+      },
+      entity_type: entityType,
+      entity_id: String(entityId),
+    },
+  });
+  expect(res.status()).toBe(201);
+  return ((await res.json()) as { data: { url: string } }).data.url;
 }
 
 test.describe("photos", () => {
@@ -122,14 +125,19 @@ test.describe("photos", () => {
     expect(body.error).toBe("关联对象不存在");
   });
 
-  test("deletes a photo through the gallery ✕ button", async ({ page }) => {
-    // Upload onto café 7 (Kurasu Kyoto): photo upload is owner-gated, so the
-    // café must belong to the default session (Baiwei = user 1) for the upload
-    // UI to render. Café 7 is Baiwei's and no other spec touches it. Counts are
-    // relative (before vs. after), so prior photos on it would be harmless.
-    const src = await uploadPhoto(page, "/cafes/7");
+  test("deletes a photo through the café gallery ✕ button", async ({
+    page,
+    request,
+  }) => {
+    // Café 7 (Kurasu Kyoto) belongs to Baiwei (the default session). Upload via
+    // the API (the inline café uploader was removed); the gallery's ✕ delete on
+    // the café detail page is unchanged. The newest photo is first, so deleting
+    // .first() removes the one we just uploaded.
+    const src = await apiUploadPhoto(request, "cafe", 7);
+    await page.goto("/cafes/7");
     const gallery = page.getByTestId("gallery-image");
     const before = await gallery.count();
+    expect(before).toBeGreaterThan(0);
 
     page.on("dialog", (dialog) => dialog.accept());
     await page.getByTestId("photo-delete-button").first().click();

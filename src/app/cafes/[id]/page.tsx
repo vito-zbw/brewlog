@@ -9,7 +9,6 @@ import {
 } from "@/lib/queries";
 import { formatVisitDate } from "@/lib/terms";
 import { PhotoGallery } from "@/components/PhotoGallery";
-import { PhotoUpload } from "@/components/PhotoUpload";
 import { ShareLinkButton } from "@/components/ShareLinkButton";
 import { VisitCard } from "@/components/VisitCard";
 
@@ -37,7 +36,6 @@ export default async function CafeDetailPage({
     getCafeCommunityStats(cafeId),
     auth(),
   ]);
-  const isOwner = session?.user?.id === cafe.user_id;
 
   // getVisitsWithBeans orders by visit_date DESC, so visits[0] is the newest.
   const lastVisitDate = visits.length > 0 ? visits[0].visit_date : null;
@@ -100,7 +98,6 @@ export default async function CafeDetailPage({
         照片
       </h2>
       <div className="mb-8 space-y-4">
-        {isOwner && <PhotoUpload entityType="cafe" entityId={cafeId} />}
         <PhotoGallery photos={photos} currentUserId={session?.user?.id ?? null} />
       </div>
 
