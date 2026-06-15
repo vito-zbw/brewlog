@@ -1,4 +1,29 @@
+import fs from "node:fs";
+import path from "node:path";
 import { test, expect } from "../../helpers/fixtures";
+
+// Local-disk backend (no R2_* env in tests): a stored avatar URL is
+// /api/uploads/<key> and the file lives at data/uploads/<key> under the shared
+// project cwd, so the test worker can stat the same file the server wrote.
+const uploadPath = (image: string) =>
+  path.join(process.cwd(), "data", "uploads", image.replace("/api/uploads/", ""));
+
+async function uploadAvatar(
+  request: import("@playwright/test").APIRequestContext
+): Promise<string> {
+  const res = await request.post("/api/users/1/avatar", {
+    multipart: {
+      file: {
+        name: "avatar.jpg",
+        mimeType: "image/jpeg",
+        buffer: fs.readFileSync("tests/fixtures/test-photo.jpg"),
+      },
+    },
+  });
+  expect(res.ok()).toBeTruthy();
+  const { data } = await res.json();
+  return uploadPath(data.image);
+}
 
 // Account settings: rename (unique), avatar upload/remove, account info, route
 // protection. Runs as Baiwei (user1, id 1) by default. The shared test DB
@@ -70,6 +95,42 @@ test.describe("账号设置 /settings", () => {
 
     await page.getByTestId("avatar-remove").click();
     await expect(page.getByTestId("avatar-remove")).toHaveCount(0);
+  });
+
+  test("removing a custom avatar deletes its stored file", async ({
+    request,
+  }) => {
+    const filePath = await uploadAvatar(request);
+    expect(fs.existsSync(filePath)).toBe(true);
+
+    await request.delete("/api/users/1/avatar");
+    expect(fs.existsSync(filePath)).toBe(false);
+  });
+
+  test("replacing a custom avatar deletes the previous file", async ({
+    request,
+  }) => {
+    const first = await uploadAvatar(request);
+    expect(fs.existsSync(first)).toBe(true);
+
+    const second = await uploadAvatar(request);
+    expect(second).not.toBe(first);
+    expect(fs.existsSync(second)).toBe(true);
+    expect(fs.existsSync(first)).toBe(false);
+  });
+
+  test("removing an avatar when none is set is a safe no-op", async ({
+    request,
+  }) => {
+    // A fresh/OAuth user has no custom upload to purge (image is null or a
+    // provider URL). setAvatar must short-circuit, not throw — and unlike the
+    // afterEach hook, this asserts the response is actually ok (the route's
+    // catch returns 500 rather than re-throwing, so a silent DELETE wouldn't
+    // be caught otherwise).
+    const res = await request.delete("/api/users/1/avatar");
+    expect(res.ok()).toBeTruthy();
+    const { data } = await res.json();
+    expect(data.image).toBeNull();
   });
 
   test("redirects logged-out visitors to login", async ({ page, context }) => {

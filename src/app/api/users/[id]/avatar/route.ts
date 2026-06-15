@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { updateUserImage } from "@/lib/queries";
-import { isSupportedImageType, savePhoto, photoPublicUrl } from "@/lib/storage";
+import { getUserById, updateUserImage } from "@/lib/queries";
+import {
+  isSupportedImageType,
+  savePhoto,
+  photoPublicUrl,
+  photoKeyFromUrl,
+  deletePhotoObject,
+} from "@/lib/storage";
 import { requireUserId, UnauthorizedError } from "@/lib/auth-helpers";
 
 type Params = { params: Promise<{ id: string }> };
@@ -11,6 +17,27 @@ async function ownerId(params: Params["params"]): Promise<number | null> {
   const userId = await requireUserId();
   const { id } = await params;
   return Number(id) === userId ? userId : null;
+}
+
+/**
+ * Points the user's avatar at `nextImage` (a stored URL, or null to reset to
+ * default) and purges the previous custom upload from storage so removed and
+ * replaced avatars don't pile up in R2. DB first, then best-effort purge —
+ * mirroring the visit/photo deletion pattern: a purge failure leaves a logged
+ * orphan, never a broken image reference. photoKeyFromUrl returns null for
+ * OAuth/foreign URLs, so those are never touched.
+ */
+async function setAvatar(userId: number, nextImage: string | null): Promise<void> {
+  const previous = await getUserById(userId);
+  await updateUserImage(userId, nextImage);
+  const oldKey = photoKeyFromUrl(previous?.image ?? null);
+  if (oldKey && oldKey !== photoKeyFromUrl(nextImage)) {
+    try {
+      await deletePhotoObject(oldKey);
+    } catch (err) {
+      console.error(`avatar purge: orphaned storage object ${oldKey}:`, err);
+    }
+  }
 }
 
 export async function POST(request: NextRequest, { params }: Params) {
@@ -42,7 +69,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     const buffer = Buffer.from(await file.arrayBuffer());
     const key = await savePhoto(buffer, file.type, "avatar");
     const image = photoPublicUrl(key);
-    await updateUserImage(userId, image);
+    await setAvatar(userId, image);
     return NextResponse.json({ data: { image } });
   } catch (err) {
     if (err instanceof UnauthorizedError) {
@@ -59,7 +86,7 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
     if (userId === null) {
       return NextResponse.json({ error: "只能修改自己的资料" }, { status: 403 });
     }
-    await updateUserImage(userId, null);
+    await setAvatar(userId, null);
     return NextResponse.json({ data: { image: null } });
   } catch (err) {
     if (err instanceof UnauthorizedError) {

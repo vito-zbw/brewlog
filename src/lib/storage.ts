@@ -127,3 +127,19 @@ export function photoPublicUrl(key: string): string {
   if (r2Config) return `${r2Config.publicUrl}/${key}`;
   return `/api/uploads/${key}`;
 }
+
+/**
+ * The inverse of photoPublicUrl: the storage key for a URL this app wrote, or
+ * null for anything we don't own — an OAuth provider's avatar URL, a foreign
+ * URL, null, or a URL from the other backend. Avatar cleanup uses this to purge
+ * only objects we actually stored, never a Google/GitHub avatar. Backend-aware
+ * to match photoPublicUrl: the R2 public-URL prefix when R2 is configured,
+ * otherwise the local /api/uploads/ prefix.
+ */
+export function photoKeyFromUrl(url: string | null): string | null {
+  if (!url) return null;
+  const prefix = r2Config ? `${r2Config.publicUrl}/` : "/api/uploads/";
+  if (!url.startsWith(prefix)) return null;
+  const key = url.slice(prefix.length);
+  return key.length > 0 ? key : null;
+}
