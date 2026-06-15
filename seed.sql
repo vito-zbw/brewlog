@@ -41,14 +41,14 @@ INSERT INTO beans (name, origin_country, origin_region, farm, roaster, processin
 -- CAFES（坐标为大致位置；城市/国家用中文）
 -- ============================================================
 
-INSERT INTO cafes (name, city, country, latitude, longitude, website, user_id) VALUES
-('.jpg coffee', '广州', '中国', 23.0945, 113.2820, NULL, 1),
-('鱼眼咖啡 Fisheye Café', '广州', '中国', 23.1330, 113.3220, 'https://www.fisheyecafe.com', 2),
-('Seesaw Coffee 太古汇店', '广州', '中国', 23.1336, 113.3262, 'https://www.seesawcoffee.com', 3),
-('Manner Coffee 天环广场店', '广州', '中国', 23.1320, 113.3240, 'https://www.mannercoffee.com', 1),
-('%Arabica 深业上城店', '深圳', '中国', 22.5530, 114.0930, 'https://arabica.coffee', 2),
-('Something For Café', '深圳', '中国', 22.5400, 113.9850, NULL, 3),
-('Kurasu Kyoto', '京都', '日本', 35.0035, 135.7590, 'https://kurasu.kyoto', 1);
+INSERT INTO cafes (name, city, country, latitude, longitude, user_id) VALUES
+('.jpg coffee', '广州', '中国', 23.0945, 113.2820, 1),
+('鱼眼咖啡 Fisheye Café', '广州', '中国', 23.1330, 113.3220, 2),
+('Seesaw Coffee 太古汇店', '广州', '中国', 23.1336, 113.3262, 3),
+('Manner Coffee 天环广场店', '广州', '中国', 23.1320, 113.3240, 1),
+('%Arabica 深业上城店', '深圳', '中国', 22.5530, 114.0930, 2),
+('Something For Café', '深圳', '中国', 22.5400, 113.9850, 3),
+('Kurasu Kyoto', '京都', '日本', 35.0035, 135.7590, 1);
 
 
 -- ============================================================

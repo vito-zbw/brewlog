@@ -160,13 +160,25 @@ export async function createVisit(
 /**
  * Updates an existing visit and replaces its bean set in one transaction
  * (mirror of updateCrawl). Leaves user_id untouched — ownership never moves.
+ * If the edit moves the visit to a different café and the original café is
+ * left with no visits, that now-orphaned café (and its photos) is garbage-
+ * collected too — the same upward sweep as deleteVisit. Returns any café photo
+ * storage keys to purge (empty unless a café was collected).
  */
 export async function updateVisit(
   id: number,
   input: UpdateVisitInput
-): Promise<void> {
+): Promise<{ photoKeys: string[] }> {
   const tx = await db.transaction("write");
   try {
+    const oldCafeId =
+      firstRow<{ cafe_id: number }>(
+        await tx.execute({
+          sql: "SELECT cafe_id FROM visits WHERE id = ?",
+          args: [id],
+        })
+      )?.cafe_id ?? null;
+
     await tx.execute({
       sql: `UPDATE visits SET cafe_id = ?, visit_date = ?, brew_method = ?,
               rating_overall = ?, rating_bean_quality = ?,
@@ -194,22 +206,67 @@ export async function updateVisit(
         args: [id, beanId],
       });
     }
+
+    // Moving the visit to a different café can orphan the original one.
+    const photoKeys =
+      oldCafeId != null && oldCafeId !== input.cafe_id
+        ? await gcCafeIfOrphaned(tx, oldCafeId)
+        : [];
+
     await tx.commit();
+    return { photoKeys };
   } finally {
     tx.close();
   }
 }
 
+/** A write-transaction handle, as returned by db.transaction("write"). */
+type WriteTx = Awaited<ReturnType<typeof db.transaction>>;
+
+/**
+ * Garbage-collects a café that has no remaining visits. Cafés are only ever
+ * created alongside a visit (the inline "新增咖啡馆" path in the log form), so a
+ * visit-less café is always an orphan. Deletes the café and its photos inside
+ * the caller's write transaction and returns the café's photo storage keys so
+ * the caller can purge the underlying objects. No-op (returns []) if the café
+ * still has visits. libsql does not enforce FKs, so this cascade is manual.
+ */
+async function gcCafeIfOrphaned(tx: WriteTx, cafeId: number): Promise<string[]> {
+  const remaining = firstRow<{ n: number }>(
+    await tx.execute({
+      sql: "SELECT COUNT(*) AS n FROM visits WHERE cafe_id = ?",
+      args: [cafeId],
+    })
+  );
+  if (!remaining || remaining.n !== 0) return [];
+  const keys = mapRows<{ storage_key: string }>(
+    await tx.execute({
+      sql: "SELECT storage_key FROM photos WHERE entity_type = 'cafe' AND entity_id = ?",
+      args: [cafeId],
+    })
+  ).map((r) => r.storage_key);
+  await tx.execute({
+    sql: "DELETE FROM photos WHERE entity_type = 'cafe' AND entity_id = ?",
+    args: [cafeId],
+  });
+  await tx.execute({ sql: "DELETE FROM cafes WHERE id = ?", args: [cafeId] });
+  return keys;
+}
+
 /**
  * Hard-deletes a visit and every dependent row (visit_beans join rows, the
  * visit's photos, and crawl_visits stops), then resequences the remaining
- * stops of any affected crawl to a dense 1..n order. Returns the deleted
- * visit's photo storage keys so the caller can purge the underlying objects
- * (storage I/O can't live inside the DB transaction).
+ * stops of any affected crawl to a dense 1..n order. If this was the parent
+ * café's last visit, the now-orphaned café (and its photos) is removed too —
+ * cafés are only ever created alongside a visit, so a visit-less café is
+ * always an orphan. Returns the deleted visit's photo storage keys (plus any
+ * café photo keys) so the caller can purge the underlying objects (storage
+ * I/O can't live inside the DB transaction).
  *
  * libsql does not enforce foreign keys, so every dependent is removed
  * explicitly rather than relying on ON DELETE CASCADE — same reasoning as
- * deleteCrawl in ./crawls.
+ * deleteCrawl in ./crawls. The manual cascade now also sweeps *upward* to the
+ * childless parent café, not just downward to children.
  */
 export async function deleteVisit(
   id: number
@@ -229,6 +286,16 @@ export async function deleteVisit(
         args: [id],
       })
     ).map((r) => r.crawl_id);
+
+    // Capture the parent café before the visit row is gone, so we can GC it
+    // below if this delete leaves it with no visits.
+    const cafeId =
+      firstRow<{ cafe_id: number }>(
+        await tx.execute({
+          sql: "SELECT cafe_id FROM visits WHERE id = ?",
+          args: [id],
+        })
+      )?.cafe_id ?? null;
 
     await tx.execute({
       sql: "DELETE FROM visit_beans WHERE visit_id = ?",
@@ -260,6 +327,14 @@ export async function deleteVisit(
     }
 
     await tx.execute({ sql: "DELETE FROM visits WHERE id = ?", args: [id] });
+
+    // Upward sweep: if the café just lost its last visit, garbage-collect it
+    // and its photos (their storage keys ride along in photoKeys for the
+    // caller to purge). Runs after the visit row is gone so the count is exact.
+    if (cafeId != null) {
+      photoKeys.push(...(await gcCafeIfOrphaned(tx, cafeId)));
+    }
+
     await tx.commit();
     return { photoKeys };
   } finally {

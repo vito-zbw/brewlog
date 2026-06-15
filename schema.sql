@@ -41,7 +41,6 @@ CREATE TABLE IF NOT EXISTS cafes (
     country TEXT NOT NULL,                       -- e.g. "中国"
     latitude REAL NOT NULL,                      -- for map pin placement
     longitude REAL NOT NULL,
-    website TEXT,                                -- optional URL
     user_id INTEGER NOT NULL REFERENCES users(id),
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

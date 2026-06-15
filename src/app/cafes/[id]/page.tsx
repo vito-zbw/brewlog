@@ -71,16 +71,6 @@ export default async function CafeDetailPage({
         <p className="text-warm-gray text-lg mb-2">
           {cafe.city}, {cafe.country}
         </p>
-        {cafe.website && (
-          <a
-            href={cafe.website}
-            target="_blank"
-            rel="noreferrer"
-            className="text-terracotta hover:underline text-sm inline-block mb-2"
-          >
-            官网
-          </a>
-        )}
 
         {stats.visit_count > 0 && (
           <div data-testid="cafe-community-stats" className="mt-4">

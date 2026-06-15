@@ -97,7 +97,7 @@ export async function PUT(
     if (invalid) {
       return NextResponse.json({ error: invalid }, { status: 400 });
     }
-    await updateVisit(visitId, {
+    const { photoKeys } = await updateVisit(visitId, {
       cafe_id: Number(body.cafe_id),
       visit_date: body.visit_date,
       brew_method: body.brew_method,
@@ -108,6 +108,18 @@ export async function PUT(
       notes: body.notes ?? null,
       bean_ids: Array.isArray(body.bean_ids) ? body.bean_ids : [],
     });
+    // Re-pointing the visit to another café can orphan the old one; purge its
+    // photo objects best-effort (mirrors DELETE), DB rows already gone.
+    for (const key of photoKeys) {
+      try {
+        await deletePhotoObject(key);
+      } catch (storageErr) {
+        console.error(
+          `PUT /api/visits/${visitId}: orphaned storage object ${key}:`,
+          storageErr
+        );
+      }
+    }
     return NextResponse.json({ data: { id: visitId } });
   } catch (err) {
     if (err instanceof UnauthorizedError) {

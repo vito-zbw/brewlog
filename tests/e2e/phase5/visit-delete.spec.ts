@@ -18,10 +18,13 @@ interface CrawlBody {
 const SEED_CAFE_ID = 1; // ".jpg coffee" from seed.sql
 
 /** Creates a visit owned by the request's identity and returns its id. */
-async function createVisit(request: APIRequestContext): Promise<number> {
+async function createVisit(
+  request: APIRequestContext,
+  cafeId: number = SEED_CAFE_ID
+): Promise<number> {
   const res = await request.post("/api/visits", {
     data: {
-      cafe_id: SEED_CAFE_ID,
+      cafe_id: cafeId,
       visit_date: "2026-06-14",
       brew_method: "V60",
       rating_overall: 5,
@@ -29,6 +32,21 @@ async function createVisit(request: APIRequestContext): Promise<number> {
       rating_barista_skill: 4,
       rating_ambiance: 3,
       notes: `E2E删除测试 ${Date.now()}`,
+    },
+  });
+  expect(res.status()).toBe(201);
+  return ((await res.json()) as VisitIdBody).data.id;
+}
+
+/** Creates a fresh café owned by the request's identity and returns its id. */
+async function createCafe(request: APIRequestContext): Promise<number> {
+  const res = await request.post("/api/cafes", {
+    data: {
+      name: `E2E孤儿咖啡馆 ${Date.now()}`,
+      city: "广州",
+      country: "中国",
+      latitude: 23.1,
+      longitude: 113.3,
     },
   });
   expect(res.status()).toBe(201);
@@ -94,6 +112,78 @@ test.describe("删除探店记录 — owner", () => {
     expect(after.status()).toBe(200);
     const crawl = ((await after.json()) as CrawlBody).data;
     expect(crawl.stops.map((s) => s.id)).toEqual([v1, v3]);
+
+    // cleanup: remove remaining stops' visits so no orphan café/visit lingers
+    await request.delete(`/api/visits/${v1}`);
+    await request.delete(`/api/visits/${v3}`);
+  });
+});
+
+test.describe("删除探店记录 — 孤儿咖啡馆清理 (orphan café cleanup)", () => {
+  test("deleting the only visit to a café removes the now-orphaned café", async ({
+    request,
+  }) => {
+    const cafeId = await createCafe(request);
+    const visitId = await createVisit(request, cafeId);
+
+    // Sanity: the café exists while it has a visit.
+    expect((await request.get(`/api/cafes/${cafeId}`)).status()).toBe(200);
+
+    const del = await request.delete(`/api/visits/${visitId}`);
+    expect(del.status()).toBe(200);
+
+    // The café had no other visits, so it is garbage-collected.
+    expect((await request.get(`/api/cafes/${cafeId}`)).status()).toBe(404);
+  });
+
+  test("deleting one of two visits leaves the still-referenced café intact", async ({
+    request,
+  }) => {
+    const cafeId = await createCafe(request);
+    const v1 = await createVisit(request, cafeId);
+    const v2 = await createVisit(request, cafeId);
+
+    const del = await request.delete(`/api/visits/${v1}`);
+    expect(del.status()).toBe(200);
+
+    // Still has v2, so it must NOT be removed.
+    expect((await request.get(`/api/cafes/${cafeId}`)).status()).toBe(200);
+
+    // cleanup: deleting the last visit GCs the café.
+    expect((await request.delete(`/api/visits/${v2}`)).status()).toBe(200);
+    expect((await request.get(`/api/cafes/${cafeId}`)).status()).toBe(404);
+  });
+
+  test("moving a visit to another café garbage-collects the now-orphaned original", async ({
+    request,
+  }) => {
+    const cafeA = await createCafe(request);
+    const cafeB = await createCafe(request);
+    const visitId = await createVisit(request, cafeA);
+
+    // Re-point the visit from café A to café B via PUT (the edit flow).
+    const put = await request.put(`/api/visits/${visitId}`, {
+      data: {
+        cafe_id: cafeB,
+        visit_date: "2026-06-14",
+        brew_method: "V60",
+        rating_overall: 5,
+        rating_bean_quality: 4,
+        rating_barista_skill: 4,
+        rating_ambiance: 3,
+        notes: "moved to B",
+        bean_ids: [],
+      },
+    });
+    expect(put.status()).toBe(200);
+
+    // Café A lost its only visit → garbage-collected; B now holds the visit.
+    expect((await request.get(`/api/cafes/${cafeA}`)).status()).toBe(404);
+    expect((await request.get(`/api/cafes/${cafeB}`)).status()).toBe(200);
+
+    // cleanup: deleting the visit GCs café B too.
+    expect((await request.delete(`/api/visits/${visitId}`)).status()).toBe(200);
+    expect((await request.get(`/api/cafes/${cafeB}`)).status()).toBe(404);
   });
 });
 

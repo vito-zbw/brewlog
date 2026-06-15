@@ -16,6 +16,8 @@
     "migrate:phase4": "node --env-file-if-exists=.env.local scripts/migrate-phase4.mjs",
     "migrate:phase5": "node --env-file-if-exists=.env.local scripts/migrate-phase5.mjs",
     "migrate:username": "node --env-file-if-exists=.env.local scripts/migrate-username.mjs",
+    "migrate:drop-cafe-website": "node --env-file-if-exists=.env.local scripts/migrate-drop-cafe-website.mjs",
+    "migrate:orphan-cafes": "node --env-file-if-exists=.env.local scripts/migrate-orphan-cafes.mjs",
     "reset-password": "node --env-file-if-exists=.env.local scripts/reset-password.mjs",
     "test:e2e": "npm run build && npm run db:init:test && playwright test",
     "verify": "npm run typecheck && npm run lint && npm run test:e2e"

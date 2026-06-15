@@ -57,15 +57,14 @@ export async function getCafeCommunityStats(
 
 export async function createCafe(input: NewCafeInput): Promise<Cafe> {
   const rs = await db.execute({
-    sql: `INSERT INTO cafes (name, city, country, latitude, longitude, website, user_id)
-          VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    sql: `INSERT INTO cafes (name, city, country, latitude, longitude, user_id)
+          VALUES (?, ?, ?, ?, ?, ?)`,
     args: [
       input.name,
       input.city,
       input.country,
       input.latitude,
       input.longitude,
-      input.website ?? null,
       input.user_id,
     ],
   });

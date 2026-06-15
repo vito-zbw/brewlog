@@ -28,7 +28,6 @@ export interface Cafe {
   country: string;
   latitude: number;
   longitude: number;
-  website: string | null;
   user_id: number;
   created_at: string;
 }
@@ -187,7 +186,6 @@ export interface NewCafeInput {
   country: string;
   latitude: number;
   longitude: number;
-  website?: string | null;
   user_id: number;
 }
 
