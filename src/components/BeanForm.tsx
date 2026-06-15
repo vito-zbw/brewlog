@@ -65,6 +65,11 @@ export function BeanForm({
     initial?.tasting_notes_freetext ?? ""
   );
 
+  // Seeded once from the prop, then managed locally (deletes update this state).
+  // Every caller mounts a fresh form per target — the edit page renders anew and
+  // the inline editor keys BeanForm by bean id — so there is no stale-prop risk.
+  // A sync-from-prop effect would be WRONG here: it would resurrect a
+  // just-deleted photo on the parent's next render.
   const [existingPhotos, setExistingPhotos] = useState<Photo[]>(
     initialPhotos ?? []
   );

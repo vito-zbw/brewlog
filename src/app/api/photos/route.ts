@@ -12,8 +12,11 @@ import type { PhotoEntityType } from "@/types";
 const MAX_BYTES = 4 * 1024 * 1024; // client downscales first; Vercel caps bodies at ~4.5MB
 const ENTITY_TYPES: PhotoEntityType[] = ["bean", "cafe", "visit"];
 
-// Public read: list an entity's photos. Used by client forms (e.g. inline bean
-// editing) that need a fresh photo list without a full server render.
+// Public read — intentional, matching the app's access model: every viewing
+// page and GET API works without login, and the entity detail pages already
+// render this exact photo list (url/caption) to anyone. Mutations (POST/DELETE)
+// stay owner-gated. Used by client forms (e.g. inline bean editing) that need a
+// fresh list without a full server render.
 export async function GET(request: NextRequest) {
   try {
     const params = request.nextUrl.searchParams;

@@ -326,6 +326,32 @@ test.describe("咖啡豆 编辑 — owner", () => {
     expect(((await photos.json()) as { data: unknown[] }).data.length).toBe(1);
   });
 
+  test("inline edit deletes an existing photo on an owned bean", async ({
+    page,
+    request,
+  }) => {
+    const { id, name } = await createBean(request);
+    await uploadBeanPhoto(request, id);
+
+    await page.goto("/log");
+    await expect(
+      page.getByTestId("log-bean-chip").filter({ hasText: name })
+    ).toBeVisible();
+    await page.getByRole("button", { name: `编辑 ${name}` }).click();
+
+    // The inline editor loads the bean's existing photo with a delete control.
+    await expect(page.getByTestId("bean-edit-existing-photo")).toHaveCount(1);
+    page.on("dialog", (dialog) => dialog.accept());
+    await page.getByTestId("bean-edit-existing-photo-delete").click();
+    await expect(page.getByTestId("bean-edit-existing-photo")).toHaveCount(0);
+
+    // Gone server-side too.
+    const photos = await request.get(
+      `/api/photos?entity_type=bean&entity_id=${id}`
+    );
+    expect(((await photos.json()) as { data: unknown[] }).data.length).toBe(0);
+  });
+
   test("inline edit & delete controls appear for owned bean chips", async ({
     page,
     request,
