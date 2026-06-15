@@ -6,6 +6,7 @@ import { PROCESSING_METHODS, ROAST_LEVELS, optionLabel } from "@/lib/terms";
 import { PhotoGallery } from "@/components/PhotoGallery";
 import { PhotoUpload } from "@/components/PhotoUpload";
 import { ShareLinkButton } from "@/components/ShareLinkButton";
+import { BeanDeleteButton } from "@/components/BeanDeleteButton";
 import { VisitCard } from "@/components/VisitCard";
 
 export const dynamic = "force-dynamic";
@@ -57,7 +58,21 @@ export default async function BeanDetailPage({
           <h1 className="text-3xl font-bold font-[Playfair_Display] text-espresso">
             {bean.name}
           </h1>
-          <ShareLinkButton />
+          <div className="flex items-center gap-2 shrink-0">
+            <ShareLinkButton />
+            {isOwner && (
+              <>
+                <Link
+                  data-testid="bean-edit-link"
+                  href={`/beans/${bean.id}/edit`}
+                  className="px-3 py-1.5 border border-cream-dark rounded-lg text-sm text-espresso hover:bg-cream transition-colors"
+                >
+                  编辑
+                </Link>
+                <BeanDeleteButton beanId={bean.id} />
+              </>
+            )}
+          </div>
         </div>
         <p
           className={`text-warm-gray text-lg ${

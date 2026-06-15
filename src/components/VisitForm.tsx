@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { Bean, Cafe } from "@/types";
+import type { Bean, Cafe, UpdateBeanInput } from "@/types";
 import { BREW_METHODS } from "@/lib/terms";
 import { RatingInput } from "@/components/RatingInput";
-import { NewBeanForm } from "@/components/NewBeanForm";
+import { BeanForm } from "@/components/BeanForm";
 import { VisitDeleteButton } from "@/components/VisitDeleteButton";
 import { LocationPicker } from "@/components/LocationPicker";
+import { uploadEntityPhoto } from "@/lib/image-client";
 import type { LatLng } from "@/lib/geo";
 
 const inputClass =
@@ -51,14 +52,19 @@ interface VisitFormProps {
     rating_ambiance: number;
     notes: string;
   };
+  /** Logged-in user id; enables inline edit/delete on beans they own. */
+  currentUserId?: number | null;
 }
 
-export function VisitForm({ initial }: VisitFormProps) {
+export function VisitForm({ initial, currentUserId = null }: VisitFormProps) {
   const router = useRouter();
   const [cafes, setCafes] = useState<Cafe[]>([]);
   const [beans, setBeans] = useState<Bean[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
+  const [editingBeanId, setEditingBeanId] = useState<number | null>(null);
+  const [beanActionError, setBeanActionError] = useState("");
+  const [beanNotice, setBeanNotice] = useState("");
 
   const [cafeId, setCafeId] = useState(initial ? String(initial.cafe_id) : "");
   const [isNewCafe, setIsNewCafe] = useState(false);
@@ -101,10 +107,78 @@ export function VisitForm({ initial }: VisitFormProps) {
     setSelectedBeanIds((prev) => (prev.includes(id) ? prev.filter((b) => b !== id) : [...prev, id]));
   };
 
-  const handleBeanCreated = (bean: Bean) => {
+  // Inline create. The bean POST must succeed (errors surface in BeanForm);
+  // the optional photo is best-effort — the bean is already saved, so a failed
+  // upload only sets a notice and never blocks selecting the bean.
+  const handleBeanCreate = async (
+    payload: UpdateBeanInput,
+    photoFile: File | null
+  ) => {
+    const res = await fetch("/api/beans", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const json = (await res.json()) as { data?: Bean; error?: string };
+    if (!res.ok || !json.data) {
+      throw new Error(json.error ?? "保存失败，请重试");
+    }
+    const bean = json.data;
+    if (photoFile) {
+      try {
+        await uploadEntityPhoto("bean", bean.id, photoFile);
+        setBeanNotice("");
+      } catch {
+        setBeanNotice("咖啡豆已保存，但照片上传失败。可稍后在咖啡豆详情页补充。");
+      }
+    }
     setBeans((prev) => [bean, ...prev]);
     setSelectedBeanIds((prev) => [...prev, bean.id]);
     setShowNewBean(false);
+  };
+
+  const handleBeanUpdate = async (payload: UpdateBeanInput) => {
+    if (editingBeanId == null) return;
+    const res = await fetch(`/api/beans/${editingBeanId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const json = (await res.json()) as { data?: Bean; error?: string };
+    if (!res.ok || !json.data) {
+      throw new Error(json.error ?? "保存失败，请重试");
+    }
+    const updated = json.data;
+    setBeans((prev) => prev.map((b) => (b.id === updated.id ? updated : b)));
+    setEditingBeanId(null);
+  };
+
+  const handleBeanDelete = async (bean: Bean) => {
+    if (
+      !window.confirm(`确定删除咖啡豆「${bean.name}」吗？此操作不可撤销。`)
+    ) {
+      return;
+    }
+    setBeanActionError("");
+    try {
+      const res = await fetch(`/api/beans/${bean.id}`, { method: "DELETE" });
+      const json = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        setBeanActionError(json.error ?? "删除失败，请重试");
+        return;
+      }
+      setBeans((prev) => prev.filter((b) => b.id !== bean.id));
+      setSelectedBeanIds((prev) => prev.filter((id) => id !== bean.id));
+      if (editingBeanId === bean.id) setEditingBeanId(null);
+    } catch {
+      setBeanActionError("删除失败，请重试");
+    }
+  };
+
+  const startBeanEdit = (id: number) => {
+    setEditingBeanId(id);
+    setShowNewBean(false);
+    setBeanActionError("");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -252,21 +326,66 @@ export function VisitForm({ initial }: VisitFormProps) {
       <div className={cardClass}>
         <h2 className={headingClass}>品尝的咖啡豆</h2>
         <div className="flex flex-wrap gap-2 mb-4">
-          {beans.map((bean) => (
-            <button key={bean.id} type="button" data-testid="log-bean-chip" onClick={() => toggleBean(bean.id)}
-              className={`text-xs px-3 py-1.5 rounded-full transition-colors ${
-                selectedBeanIds.includes(bean.id) ? "bg-sage text-cream" : "bg-cream-dark text-warm-gray hover:bg-cream-dark/80"
-              }`}>
-              {bean.name}
-            </button>
-          ))}
+          {beans.map((bean) => {
+            const selected = selectedBeanIds.includes(bean.id);
+            const owned = currentUserId != null && bean.user_id === currentUserId;
+            return (
+              <span key={bean.id} className="inline-flex items-center gap-0.5">
+                <button type="button" data-testid="log-bean-chip" onClick={() => toggleBean(bean.id)}
+                  className={`text-xs px-3 py-1.5 rounded-full transition-colors ${
+                    selected ? "bg-sage text-cream" : "bg-cream-dark text-warm-gray hover:bg-cream-dark/80"
+                  }`}>
+                  {bean.name}
+                </button>
+                {owned && (
+                  <>
+                    <button type="button" data-testid="log-bean-edit" title="编辑咖啡豆"
+                      aria-label={`编辑 ${bean.name}`} onClick={() => startBeanEdit(bean.id)}
+                      className="px-1 text-xs text-warm-gray/60 hover:text-espresso transition-colors">
+                      ✎
+                    </button>
+                    <button type="button" data-testid="log-bean-delete" title="删除咖啡豆"
+                      aria-label={`删除 ${bean.name}`} onClick={() => handleBeanDelete(bean)}
+                      className="px-1 text-xs text-warm-gray/60 hover:text-red-600 transition-colors">
+                      ✕
+                    </button>
+                  </>
+                )}
+              </span>
+            );
+          })}
         </div>
-        {!showNewBean ? (
-          <button type="button" data-testid="log-add-new-bean" onClick={() => setShowNewBean(true)} className="text-sm text-terracotta hover:underline">
+        {beanActionError && (
+          <div data-testid="log-bean-action-error" className="mb-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+            {beanActionError}
+          </div>
+        )}
+        {beanNotice && (
+          <div data-testid="log-bean-notice" className="mb-3 text-sm text-espresso bg-cream-dark/40 border border-cream-dark rounded-lg px-3 py-2">
+            {beanNotice}
+          </div>
+        )}
+        {editingBeanId != null ? (
+          <BeanForm
+            key={editingBeanId}
+            initial={beans.find((b) => b.id === editingBeanId)}
+            submitLabel="保存修改"
+            testIdPrefix="bean-edit"
+            onSubmit={handleBeanUpdate}
+            onCancel={() => setEditingBeanId(null)}
+          />
+        ) : !showNewBean ? (
+          <button type="button" data-testid="log-add-new-bean" onClick={() => { setShowNewBean(true); setBeanActionError(""); }} className="text-sm text-terracotta hover:underline">
             + 添加新豆
           </button>
         ) : (
-          <NewBeanForm onCreated={handleBeanCreated} onCancel={() => setShowNewBean(false)} />
+          <BeanForm
+            submitLabel="保存豆子"
+            showPhotoPicker
+            testIdPrefix="new-bean"
+            onSubmit={handleBeanCreate}
+            onCancel={() => setShowNewBean(false)}
+          />
         )}
       </div>
 

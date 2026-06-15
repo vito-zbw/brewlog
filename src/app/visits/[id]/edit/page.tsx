@@ -38,6 +38,7 @@ export default async function EditVisitPage({
         编辑探店记录
       </h1>
       <VisitForm
+        currentUserId={userId}
         initial={{
           id: visit.id,
           cafe_id: visit.cafe_id,

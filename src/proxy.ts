@@ -16,6 +16,7 @@ function isProtectedPage(pathname: string): boolean {
   if (pathname === "/crawls/new") return true;
   if (/^\/crawls\/[^/]+\/edit$/.test(pathname)) return true;
   if (/^\/visits\/[^/]+\/edit$/.test(pathname)) return true;
+  if (/^\/beans\/[^/]+\/edit$/.test(pathname)) return true;
   return false;
 }
 
@@ -63,6 +64,7 @@ export const config = {
     "/crawls/new",
     "/crawls/:id/edit",
     "/visits/:id/edit",
+    "/beans/:id/edit",
     "/api/:path*",
   ],
 };
