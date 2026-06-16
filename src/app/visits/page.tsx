@@ -2,8 +2,8 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import type { VisitWithDetails, Cafe, Bean as BeanType } from "@/types";
-import { VisitCard } from "@/components/VisitCard";
+import type { Cafe, Bean as BeanType } from "@/types";
+import { VisitFeed } from "@/components/VisitFeed";
 
 interface UserOption {
   id: number;
@@ -12,12 +12,9 @@ interface UserOption {
 
 function VisitsContent() {
   const searchParams = useSearchParams();
-  const [visits, setVisits] = useState<VisitWithDetails[]>([]);
   const [cafes, setCafes] = useState<Cafe[]>([]);
   const [beans, setBeans] = useState<BeanType[]>([]);
   const [users, setUsers] = useState<UserOption[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   const [cafeFilter, setCafeFilter] = useState(searchParams.get("cafe_id") ?? "");
   const [personFilter, setPersonFilter] = useState("");
@@ -46,32 +43,6 @@ function VisitsContent() {
     }
     loadFilters();
   }, []);
-
-  useEffect(() => {
-    async function loadVisits() {
-      setLoading(true);
-      setError(null);
-      const params = new URLSearchParams();
-      if (cafeFilter) params.set("cafe_id", cafeFilter);
-      if (personFilter) params.set("user_id", personFilter);
-      if (beanFilter) params.set("bean_id", beanFilter);
-
-      try {
-        const res = await fetch(`/api/visits?${params.toString()}`);
-        if (!res.ok) {
-          throw new Error(`请求失败：${res.status}`);
-        }
-        const json: { data?: VisitWithDetails[]; error?: string } = await res.json();
-        setVisits(json.data ?? []);
-      } catch {
-        setVisits([]);
-        setError("加载失败，请稍后重试。");
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadVisits();
-  }, [cafeFilter, personFilter, beanFilter]);
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -123,21 +94,15 @@ function VisitsContent() {
         </div>
       </div>
 
-      {loading ? (
-        <p className="text-warm-gray text-center py-12">加载中…</p>
-      ) : error ? (
-        <p className="text-warm-gray text-center py-12">{error}</p>
-      ) : visits.length === 0 ? (
-        <p className="text-warm-gray text-center py-12">
-          没有找到符合条件的探店记录，试试调整筛选条件。
-        </p>
-      ) : (
-        <div className="space-y-4">
-          {visits.map((visit) => (
-            <VisitCard key={visit.id} visit={visit} />
-          ))}
-        </div>
-      )}
+      <VisitFeed
+        mode="filtered"
+        endpoint="/api/visits"
+        filters={{
+          cafe_id: cafeFilter || undefined,
+          user_id: personFilter || undefined,
+          bean_id: beanFilter || undefined,
+        }}
+      />
     </div>
   );
 }

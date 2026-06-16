@@ -67,6 +67,23 @@ export interface VisitWithDetails extends Visit {
   beans: Bean[];
 }
 
+/**
+ * Keyset-pagination cursor for visit lists: the (visit_date, id) of the last
+ * row on a page. Lists order by `visit_date DESC, id DESC`, so the next page is
+ * everything strictly "older" than this pair. `id` is the unique, monotonic
+ * tiebreaker that makes the ordering total (visit_date alone has same-day ties).
+ */
+export interface VisitCursor {
+  visitDate: string; // the last row's visit_date (ISO YYYY-MM-DD)
+  id: number; // the last row's id
+}
+
+/** One page of visits plus the cursor to fetch the next page (null at the end). */
+export interface VisitsPage {
+  visits: VisitWithDetails[];
+  nextCursor: VisitCursor | null;
+}
+
 export interface CafeWithStats extends Cafe {
   max_rating: number | null;
   last_visit_date: string | null;

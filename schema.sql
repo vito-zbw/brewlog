@@ -111,6 +111,12 @@ CREATE INDEX IF NOT EXISTS idx_cafes_city ON cafes(city);
 CREATE INDEX IF NOT EXISTS idx_visits_cafe ON visits(cafe_id);
 CREATE INDEX IF NOT EXISTS idx_visits_date ON visits(visit_date DESC);
 CREATE INDEX IF NOT EXISTS idx_visits_user ON visits(user_id);
+-- Composite covering index for keyset pagination of visit lists (/visits,
+-- /feed), which order by (visit_date DESC, id DESC) and seek with
+-- "(visit_date < ?) OR (visit_date = ? AND id < ?)". Lets the planner satisfy
+-- both the seek and the ORDER BY from the index with no sort step. Added via
+-- scripts/migrate-visit-cursor-index.mjs.
+CREATE INDEX IF NOT EXISTS idx_visits_date_id ON visits(visit_date DESC, id DESC);
 CREATE INDEX IF NOT EXISTS idx_photos_entity ON photos(entity_type, entity_id);
 CREATE INDEX IF NOT EXISTS idx_follows_following ON follows(following_id);
 CREATE INDEX IF NOT EXISTS idx_crawls_user ON crawls(user_id);

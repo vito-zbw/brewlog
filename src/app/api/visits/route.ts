@@ -1,19 +1,41 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getVisitsWithBeans, createVisit, existingBeanIds } from "@/lib/queries";
+import {
+  getVisitsWithBeans,
+  getVisitsPage,
+  createVisit,
+  existingBeanIds,
+} from "@/lib/queries";
 import { requireUserId, UnauthorizedError } from "@/lib/auth-helpers";
 import { validateVisitBody } from "@/lib/visit-validation";
+import { decodeCursor, encodeCursor } from "@/lib/cursor";
 
 export async function GET(request: NextRequest) {
   try {
     const params = request.nextUrl.searchParams;
-    const limit = params.get("limit");
-    const visits = await getVisitsWithBeans({
+    const filters = {
       cafeId: params.get("cafe_id") ? Number(params.get("cafe_id")) : undefined,
       userId: params.get("user_id") ? Number(params.get("user_id")) : undefined,
       beanId: params.get("bean_id") ? Number(params.get("bean_id")) : undefined,
-      limit: limit ? Number(limit) : undefined,
+    };
+
+    // Legacy fixed-count mode (crawl pickers, edit/delete tooling): `?limit=N`
+    // returns exactly N rows with no pagination envelope. Kept verbatim for
+    // backward compatibility; `cursor` is ignored when `limit` is present.
+    const limit = params.get("limit");
+    if (limit) {
+      const visits = await getVisitsWithBeans({
+        ...filters,
+        limit: Number(limit),
+      });
+      return NextResponse.json({ data: visits });
+    }
+
+    // Default mode: one keyset page plus an opaque cursor for the next page.
+    const page = await getVisitsPage(filters, decodeCursor(params.get("cursor")));
+    return NextResponse.json({
+      data: page.visits,
+      nextCursor: page.nextCursor ? encodeCursor(page.nextCursor) : null,
     });
-    return NextResponse.json({ data: visits });
   } catch (err) {
     console.error("GET /api/visits failed:", err);
     return NextResponse.json({ error: "加载探店记录失败" }, { status: 500 });

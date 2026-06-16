@@ -2,7 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { getFeedVisits } from "@/lib/queries";
-import { VisitCard } from "@/components/VisitCard";
+import { encodeCursor } from "@/lib/cursor";
+import { VisitFeed } from "@/components/VisitFeed";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +11,9 @@ export default async function FeedPage() {
   const session = await auth();
   if (typeof session?.user?.id !== "number") redirect("/login");
 
-  const visits = await getFeedVisits(session.user.id);
+  // Server-render page one (fast first paint, auth-gated); VisitFeed loads
+  // older pages on demand from /api/feed using the encoded cursor.
+  const page = await getFeedVisits(session.user.id, null);
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -18,7 +21,7 @@ export default async function FeedPage() {
         关注动态
       </h1>
 
-      {visits.length === 0 ? (
+      {page.visits.length === 0 ? (
         <div
           data-testid="feed-empty"
           className="bg-white rounded-xl shadow-sm border border-cream-dark/50 p-8 text-center"
@@ -42,11 +45,14 @@ export default async function FeedPage() {
           </div>
         </div>
       ) : (
-        <div className="space-y-4">
-          {visits.map((visit) => (
-            <VisitCard key={visit.id} visit={visit} />
-          ))}
-        </div>
+        <VisitFeed
+          mode="seeded"
+          endpoint="/api/feed"
+          initial={{
+            visits: page.visits,
+            nextCursor: page.nextCursor ? encodeCursor(page.nextCursor) : null,
+          }}
+        />
       )}
     </div>
   );

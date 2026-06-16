@@ -3,9 +3,14 @@ import type {
   Bean,
   NewVisitInput,
   UpdateVisitInput,
+  VisitCursor,
+  VisitsPage,
   VisitWithDetails,
 } from "@/types";
 import { mapRows, firstRow } from "./util";
+
+/** Default page size for keyset-paginated visit lists (/visits, /feed). */
+export const DEFAULT_PAGE_SIZE = 20;
 
 export interface VisitFilters {
   cafeId?: number;
@@ -46,9 +51,20 @@ async function attachBeans(
   return visits.map((v) => ({ ...v, beans: byVisit.get(v.id) ?? [] }));
 }
 
-export async function getVisitsWithBeans(
-  filters: VisitFilters = {}
-): Promise<VisitWithDetails[]> {
+/**
+ * Builds the SELECT + WHERE + ORDER BY shared by every visit list (no LIMIT).
+ * Ordering is unified across all surfaces: `visit_date DESC, id DESC`. `id` is
+ * a unique, monotonic tiebreaker, which both makes the ordering deterministic
+ * for keyset pagination and keeps /feed and /visits showing the same visit in
+ * the same spot. `followerId` (kept separate from filters.userId, which means
+ * "authored by this user") restricts to the feed scope — visits by people the
+ * follower follows.
+ */
+function buildVisitQuery(
+  filters: VisitFilters,
+  followerId: number | undefined,
+  cursor: VisitCursor | null
+): { sql: string; args: (string | number)[] } {
   let sql = `${VISIT_SELECT} WHERE 1=1`;
   const args: (string | number)[] = [];
 
@@ -64,16 +80,75 @@ export async function getVisitsWithBeans(
     sql += " AND v.id IN (SELECT visit_id FROM visit_beans WHERE bean_id = ?)";
     args.push(filters.beanId);
   }
-  sql += " ORDER BY v.visit_date DESC, v.created_at DESC";
-  if (filters.limit) {
-    sql += " LIMIT ?";
-    args.push(filters.limit);
+  if (followerId !== undefined) {
+    sql +=
+      " AND v.user_id IN (SELECT following_id FROM follows WHERE follower_id = ?)";
+    args.push(followerId);
   }
+  if (cursor) {
+    // Keyset "older than the cursor" predicate for `visit_date DESC, id DESC`.
+    // Explicit two-clause OR form (not SQLite row-value tuples, which compare
+    // with ASC semantics and misbehave against DESC-ordered keys).
+    sql += " AND (v.visit_date < ? OR (v.visit_date = ? AND v.id < ?))";
+    args.push(cursor.visitDate, cursor.visitDate, cursor.id);
+  }
+  sql += " ORDER BY v.visit_date DESC, v.id DESC";
+  return { sql, args };
+}
 
+/**
+ * Full (unbounded, unless filters.limit is set) visit list. Signature and
+ * `VisitWithDetails[]` return shape are unchanged for its existing callers —
+ * including the crawl pickers, which need every selectable visit, not a page.
+ * Only the ORDER BY tiebreaker changed (created_at → id) via buildVisitQuery.
+ */
+export async function getVisitsWithBeans(
+  filters: VisitFilters = {}
+): Promise<VisitWithDetails[]> {
+  const { sql, args } = buildVisitQuery(filters, undefined, null);
+  let finalSql = sql;
+  const finalArgs = [...args];
+  if (filters.limit) {
+    finalSql += " LIMIT ?";
+    finalArgs.push(filters.limit);
+  }
   const visits = mapRows<Omit<VisitWithDetails, "beans">>(
-    await db.execute({ sql, args })
+    await db.execute({ sql: finalSql, args: finalArgs })
   );
   return attachBeans(visits);
+}
+
+/**
+ * Core keyset pagination: fetches one extra row (pageSize + 1) to detect a
+ * further page without a COUNT, derives nextCursor from the last kept row, and
+ * attaches beans only to the returned page (so the IN(...) bind list is bounded
+ * by pageSize, never by the total table size).
+ */
+async function fetchVisitsPage(
+  filters: VisitFilters,
+  followerId: number | undefined,
+  cursor: VisitCursor | null,
+  pageSize: number
+): Promise<VisitsPage> {
+  const { sql, args } = buildVisitQuery(filters, followerId, cursor);
+  const rows = mapRows<Omit<VisitWithDetails, "beans">>(
+    await db.execute({ sql: `${sql} LIMIT ?`, args: [...args, pageSize + 1] })
+  );
+  const hasMore = rows.length > pageSize;
+  const pageRows = hasMore ? rows.slice(0, pageSize) : rows;
+  const last = pageRows[pageRows.length - 1];
+  const nextCursor =
+    hasMore && last ? { visitDate: last.visit_date, id: last.id } : null;
+  return { visits: await attachBeans(pageRows), nextCursor };
+}
+
+/** One keyset page of the public visit timeline (optionally filtered). */
+export function getVisitsPage(
+  filters: VisitFilters,
+  cursor: VisitCursor | null,
+  pageSize: number = DEFAULT_PAGE_SIZE
+): Promise<VisitsPage> {
+  return fetchVisitsPage(filters, undefined, cursor, pageSize);
 }
 
 export async function getVisitWithBeans(
@@ -87,21 +162,18 @@ export async function getVisitWithBeans(
   return withBeans;
 }
 
-/** Visits from users the given user follows, most recently logged first. */
-export async function getFeedVisits(
+/**
+ * One keyset page of the activity feed: visits by people `userId` follows,
+ * ordered by when the visit happened (visit_date DESC, id DESC) — aligned with
+ * the public timeline so the same visit sits in the same place on both, and
+ * paged so a busy followed set no longer silently hides older activity.
+ */
+export function getFeedVisits(
   userId: number,
-  limit = 50
-): Promise<VisitWithDetails[]> {
-  const visits = mapRows<Omit<VisitWithDetails, "beans">>(
-    await db.execute({
-      sql: `${VISIT_SELECT}
-            WHERE v.user_id IN (SELECT following_id FROM follows WHERE follower_id = ?)
-            ORDER BY v.created_at DESC, v.visit_date DESC
-            LIMIT ?`,
-      args: [userId, limit],
-    })
-  );
-  return attachBeans(visits);
+  cursor: VisitCursor | null,
+  pageSize: number = DEFAULT_PAGE_SIZE
+): Promise<VisitsPage> {
+  return fetchVisitsPage({}, userId, cursor, pageSize);
 }
 
 /** Specific visits by id (crawl stops). */

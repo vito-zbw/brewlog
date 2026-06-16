@@ -61,7 +61,7 @@ Not yet built — a candidate roadmap for the next round of work. Pick from thes
 - **Notifications**: in-app feed of new followers, follow-backs, and activity from people you follow (in-app only — no email, same $0 constraint as Phase 5 auth)
 - **Comments & reactions**: lightweight comments or a 👍 on visits, beans, and crawls — the first genuinely social write surface beyond follows
 - **Richer discovery**: discrete origin/roaster filter controls (today origin/roaster are reachable only through the combined search box), "similar beans", and map marker clustering as café counts grow
-- **Feed & timeline pagination**: cursor-based pagination for `/feed` and the visit timeline (both currently cap at a fixed `LIMIT` with no offset — fine at present scale, a wall as the followed set grows)
+- **Feed & timeline pagination** ✅ (shipped): keyset (cursor) pagination for `/feed` and the `/visits` timeline. Both now order by the date the visit happened, with a stable `id` tiebreaker, render a `加载更多` button. Replaced the old split: `/feed` capped at `LIMIT 50` (silent truncation) and `/visits` was unbounded (fetched every visit).
 - **Account hardening**: rate-limiting on login/registration/follow (Vercel WAF or an Upstash free tier) and email-verification gating for OAuth identities — both deferred from Phase 5
 - **PWA / offline logging**: log a visit offline on mobile and sync later
 - **Data export**: let a user download their own visits/beans as JSON/CSV
@@ -208,10 +208,6 @@ The full reference with placeholders lives in the committed `.env.example`; setu
 
   Order matters: migrate first, push second — the old code tolerates extra tables/columns, but new code 500s on missing ones.
 
-  **Full migration order** for upgrading a pre-Phase-3 cloud database to current:
-  `migrate:phase3` → `migrate:phase4` → `migrate:phase5` → `migrate:username` → `migrate:drop-cafe-website` → `migrate:orphan-cafes`. Two scripts break the usual rule and must run AFTER the matching code is deployed, not before:
-  - `migrate:drop-cafe-website` is **destructive** (drops the unused `cafes.website` column) and inverts migrate-first — deploy the code that no longer reads it, then drop.
-  - `migrate:orphan-cafes` is a **one-time real-prod cleanup** that deletes cafés with zero visits (it will remove `seed.sql`'s demo "Something For Café" — expected; never run it against the e2e/test DB).
 - Never run migrations or seeding from app code at startup (same principle as the no-auto-seed rule).
 - Push only when `npm run verify` is fully green (typecheck → lint → build → complete Playwright suite).
 - Secrets live only in `.env.local` (gitignored) and Vercel env vars. `AUTH_DEV_LOGIN` must never be set on Vercel — it would allow passwordless login as any user.
@@ -278,23 +274,4 @@ The full reference with placeholders lives in the committed `.env.example`; setu
 
 ## Changelog
 
-### 2026-06-11 — v2: roadmap expansion + Turso + Chinese localization
-
-This file replaced the original MVP-only instructions, archived at `CLAUDE.legacy.md` for reference. What changed:
-
-- **Scope**: single MVP spec → four-phase roadmap (Phase 2: photos via Cloudflare R2 + dashboard stats; Phase 3: Auth.js with `user_id` migration; Phase 4: social/public discovery)
-- **Database**: `better-sqlite3` with a local file at `data/brewlog.db` → Turso cloud SQLite via `@libsql/client`, so the app can deploy to Vercel serverless. Queries become async and must be centralized in `src/lib/queries/` (a directory split by domain and re-exported via `index.ts`; the original v2 plan was a single `queries.ts` file, later split — legacy kept queries inline in API route files)
-- **DB initialization**: legacy auto-created and auto-seeded the database on first run → now auto-seeding is forbidden; seed manually via the Turso CLI
-- **Schema/seed location**: `data/schema.sql`, `data/seed.sql` → `schema.sql`, `seed.sql` at project root
-- **UI language**: English → Simplified Chinese with bilingual coffee terminology ("水洗 Washed", Chinese first); predefined value lists are now bilingual and add 湿刨 Wet-hulled, 摩卡壶 Moka Pot, 滴滤机 Auto Drip
-- **Map**: default center Singapore → Guangzhou; pin colors by *average* rating (green ≥4 / amber 3–3.9 / red <3) → by *highest* overall visit rating (green ≥4 / yellow 3 / red ≤2)
-- **Routes**: map page `/map` → `/cafes`; log-a-visit form `/visits/new` → `/log`; new endpoint `GET /api/beans/[id]`
-
-**Resolved as of Phases 1–4 (2026-06).** The legacy-spec drift this note originally described (better-sqlite3 with auto-seed, English UI, Singapore map center, `/map` and `/visits/new` routes) was fully migrated in Phase 1 (`git tag phase-1`); Phases 2–4 then added photos/dashboard/map filters, Auth.js multi-user with `user_id` foreign keys, and the social layer (follows/feed/crawls/leaderboard). The codebase has since advanced beyond Phase 4 into Phase 5 (see the roadmap above) — treat the code as the source of truth. Access model (owner decision, 2026-06-13): the site is public-read — every viewing page and entity GET API works without login; login gates only user-specific surfaces (`/log`, `/feed`, crawl authoring, photo upload/delete, personal stats) and all mutations. Two GETs are deliberately login-gated exceptions: `/api/geocode` (used only by the authed log flow — gating protects the keyless Nominatim proxy from abuse) and the owner-private `/api/users/[id]/followers|following` lists (uniform 401/403, designed so a 404-vs-403 difference can't leak which user ids exist).
-
-### 2026-06-16 — v3: Phase 5 documented + final verification pass
-
-- **Phase 5 added to the roadmap** (bean CRUD, email/password auth + open registration, account settings/unique usernames, visit edit/delete), plus a proposed **Phase 6** outline. The code shipped these incrementally on top of Phase 4; the roadmap and `README.md` now reflect them.
-- **Access-model wording corrected** (above): public-read holds for all viewing pages and entity GET APIs; the deliberate gated-GET exceptions are `/api/geocode` and the owner-private followers/following lists.
-- **Full migration order documented** (see Deployment & Release Rules below and `docs/setup/vercel-deploy.md`): `phase3 → phase4 → phase5 → username → drop-cafe-website → orphan-cafes`. `migrate-drop-cafe-website` is destructive and INVERTS the migrate-first rule (deploy code first); `migrate-orphan-cafes` is a one-time real-prod cleanup that deletes seed.sql's demo café.
-- **Verification**: a full-fleet audit (code/live-site/docs/tests/security/features) found **no critical or high-severity defects**. Applied safe fixes (bean-existence + café/date input validation, `PhotoDeleteButton` error surfacing, an a11y `aria-label` sweep, spec-literal map-pin thresholds) and added e2e coverage (crawl edit/delete owner-gating, `/api/users/[id]/following` gating, `/crawls/[id]` public-read). `npm run verify` is green (typecheck → lint → build → complete Playwright suite).
+### 2026-06-11 — v2: This file replaced the original MVP-only instructions, archived at `CLAUDE.legacy.md` for reference.
