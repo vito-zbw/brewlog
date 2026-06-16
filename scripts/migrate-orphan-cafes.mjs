@@ -31,24 +31,26 @@ const db = createClient({
   ...(process.env.TURSO_AUTH_TOKEN ? { authToken: process.env.TURSO_AUTH_TOKEN } : {}),
 });
 
-const orphans = await db.execute(
-  "SELECT id FROM cafes WHERE NOT EXISTS (SELECT 1 FROM visits WHERE visits.cafe_id = cafes.id)"
-);
-const ids = orphans.rows.map((r) => Number(r["id"]));
+// Determine the orphans and read their photo keys INSIDE the write transaction
+// so the orphan set and the deletes are one consistent snapshot — a concurrent
+// write attaching a visit to a café can't make us delete a no-longer-orphan one.
+const tx = await db.transaction("write");
+let ids = [];
+let photoKeys = [];
+try {
+  const orphans = await tx.execute(
+    "SELECT id FROM cafes WHERE NOT EXISTS (SELECT 1 FROM visits WHERE visits.cafe_id = cafes.id)"
+  );
+  ids = orphans.rows.map((r) => Number(r["id"]));
 
-if (ids.length === 0) {
-  console.log(`migrate-orphan-cafes: no orphan cafés — nothing to do (${url}).`);
-  db.close();
-} else {
-  const placeholders = ids.map(() => "?").join(", ");
-  const photos = await db.execute({
-    sql: `SELECT storage_key FROM photos WHERE entity_type = 'cafe' AND entity_id IN (${placeholders})`,
-    args: ids,
-  });
-  const photoKeys = photos.rows.map((r) => r["storage_key"]);
+  if (ids.length > 0) {
+    const placeholders = ids.map(() => "?").join(", ");
+    const photos = await tx.execute({
+      sql: `SELECT storage_key FROM photos WHERE entity_type = 'cafe' AND entity_id IN (${placeholders})`,
+      args: ids,
+    });
+    photoKeys = photos.rows.map((r) => r["storage_key"]);
 
-  const tx = await db.transaction("write");
-  try {
     await tx.execute({
       sql: `DELETE FROM photos WHERE entity_type = 'cafe' AND entity_id IN (${placeholders})`,
       args: ids,
@@ -57,11 +59,16 @@ if (ids.length === 0) {
       sql: `DELETE FROM cafes WHERE id IN (${placeholders})`,
       args: ids,
     });
-    await tx.commit();
-  } finally {
-    tx.close();
   }
+  await tx.commit();
+} finally {
+  tx.close();
+}
 
+if (ids.length === 0) {
+  console.log(`migrate-orphan-cafes: no orphan cafés — nothing to do (${url}).`);
+  db.close();
+} else {
   console.log(
     `migrate-orphan-cafes: removed ${ids.length} orphan café(s) [${ids.join(", ")}] and ${photoKeys.length} café photo row(s) on ${url}.`
   );

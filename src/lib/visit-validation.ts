@@ -42,6 +42,12 @@ export function validateVisitBody(body: {
     return "咖啡馆参数无效";
   }
   if (
+    typeof body.visit_date !== "string" ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(body.visit_date)
+  ) {
+    return "日期格式无效";
+  }
+  if (
     !isValidRating(body.rating_overall) ||
     !isValidRating(body.rating_bean_quality) ||
     !isValidRating(body.rating_barista_skill) ||

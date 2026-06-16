@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getVisitWithBeans, deleteVisit, updateVisit } from "@/lib/queries";
+import {
+  getVisitWithBeans,
+  deleteVisit,
+  updateVisit,
+  existingBeanIds,
+} from "@/lib/queries";
 import { requireUserId, UnauthorizedError } from "@/lib/auth-helpers";
 import { deletePhotoObject } from "@/lib/storage";
 import { validateVisitBody } from "@/lib/visit-validation";
@@ -96,6 +101,13 @@ export async function PUT(
     const invalid = validateVisitBody(body);
     if (invalid) {
       return NextResponse.json({ error: invalid }, { status: 400 });
+    }
+    const beanIds: number[] = Array.isArray(body.bean_ids) ? body.bean_ids : [];
+    if (beanIds.length > 0) {
+      const existing = await existingBeanIds(beanIds);
+      if (existing.length !== new Set(beanIds).size) {
+        return NextResponse.json({ error: "咖啡豆不存在" }, { status: 400 });
+      }
     }
     const { photoKeys } = await updateVisit(visitId, {
       cafe_id: Number(body.cafe_id),

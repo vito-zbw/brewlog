@@ -50,14 +50,14 @@ npm run verify      # typecheck → lint → build → Playwright e2e (isolated 
 ## Going to Production
 
 Cloud setup steps that need a browser (Turso account, Vercel, etc.) are documented as
-self-contained guides in [`docs/setup/`](docs/setup/README.md) — paste one into a new
-Claude Code session and say "help me complete this process".
+self-contained guides in [`docs/setup/`](docs/setup/README.md).
 
 1. [`docs/setup/turso-setup.md`](docs/setup/turso-setup.md) — create the cloud database
 2. [`docs/setup/vercel-deploy.md`](docs/setup/vercel-deploy.md) — deploy to Vercel
 3. [`docs/setup/r2-setup.md`](docs/setup/r2-setup.md) — photo storage (required before uploading photos on the deployed site)
 4. [`docs/setup/oauth-setup.md`](docs/setup/oauth-setup.md) — real Google/GitHub login (required for posting on the deployed site)
-5. [`docs/setup/custom-domain.md`](docs/setup/custom-domain.md) — optional custom domain
+5. [`docs/setup/password-auth.md`](docs/setup/password-auth.md) — optional email/password login (Phase 5; run `migrate:phase5` before deploy, plus the `reset-password` helper). Needs no new cloud service or env var beyond the already-required `AUTH_SECRET`
+6. [`docs/setup/custom-domain.md`](docs/setup/custom-domain.md) — optional custom domain
 
 All env vars are documented in `.env.example`.
 
@@ -93,7 +93,9 @@ original language. The database stores canonical English values for closed lists
 - **Phase 2** ✅ — Photos and polish: image uploads (Cloudflare R2 with local-disk dev fallback), dashboard with personal stats, map filters (city / rating / brew method), café + visit detail pages
 - **Phase 3** ✅ — Multi-user: Auth.js login (Google + GitHub, one-click dev login locally), `user_id` data model with migration script, user profile pages, custom-domain guide
 - **Phase 4** ✅ — Social and discovery: public-read site, follow system + activity feed (`/feed`), coffee crawls (`/crawls`), leaderboards (`/leaderboard`), shareable links, nearby-café search
+- **Phase 5** ✅ — Account management and CRUD: full bean create/edit/delete, email/password login with open registration (`/register`), account settings + unique display names (`/settings`), visit edit/delete
+- **Phase 6** ▢ — Proposed next round (not built): notifications, comments/reactions, richer discovery filters, feed pagination, account hardening (rate-limiting, OAuth email verification). See `CLAUDE.md` for the full outline.
 
 ## Current Status
 
-**Phase 4 complete — the site is public.** Anyone can browse beans, cafés, visits, profiles, crawls, and the leaderboard without an account; logging in (Google/GitHub in production, one-click dev login locally) unlocks the personal dashboard, visit logging, photo uploads, follows + the activity feed, and crawl authoring. Databases created before Phase 4 upgrade with `npm run migrate:phase4` (additive, idempotent). Production photo uploads still require the Cloudflare R2 setup ([`docs/setup/r2-setup.md`](docs/setup/r2-setup.md)).
+**Phase 5 complete — the site is public.** Anyone can browse beans, cafés, visits, profiles, crawls, and the leaderboard without an account; logging in unlocks the personal dashboard, visit logging + editing, bean create/edit/delete, photo uploads, follows + the activity feed, and crawl authoring. Three sign-in methods: Google, GitHub, and email/password (open self-registration at `/register`); locally a one-click dev login covers all three users. Databases created before a given phase upgrade with the matching `npm run migrate:phaseN` script (additive, idempotent — see the migration order in [`docs/setup/vercel-deploy.md`](docs/setup/vercel-deploy.md)).

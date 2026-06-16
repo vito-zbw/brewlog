@@ -47,6 +47,22 @@ export async function getBean(id: number): Promise<Bean | null> {
   );
 }
 
+/**
+ * Of the given bean ids, the ones that actually exist. Used as a referential
+ * pre-check before writing visit_beans rows: libsql does not enforce foreign
+ * keys, so a visit POST/PUT carrying a non-existent bean id would otherwise
+ * create orphan join rows. Mirror of crawls' filterOwnVisitIds pre-check.
+ */
+export async function existingBeanIds(ids: number[]): Promise<number[]> {
+  if (ids.length === 0) return [];
+  const placeholders = ids.map(() => "?").join(",");
+  const rs = await db.execute({
+    sql: `SELECT id FROM beans WHERE id IN (${placeholders})`,
+    args: ids,
+  });
+  return mapRows<{ id: number }>(rs).map((r) => r.id);
+}
+
 export async function getBeanWithVisits(
   id: number
 ): Promise<BeanWithVisits | null> {

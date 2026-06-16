@@ -2,9 +2,13 @@
 -- Single source of truth for the data model.
 -- Apply with `npm run db:init` (local) or `turso db shell brewlog < schema.sql` (cloud).
 -- Fresh installs get this final shape directly; databases created before
--- Phase 3 are upgraded with scripts/migrate-phase3.mjs, the Phase 4
--- tables (follows, crawls, crawl_visits) with scripts/migrate-phase4.mjs, and
--- the Phase 5 users.password_hash column with scripts/migrate-phase5.mjs.
+-- Phase 3 are upgraded by running the migration scripts in dependency order:
+--   migrate-phase3 -> migrate-phase4 (follows/crawls/crawl_visits)
+--   -> migrate-phase5 (users.password_hash) -> migrate-username
+--   (unique case-insensitive users.name index) -> migrate-drop-cafe-website
+--   -> migrate-orphan-cafes.
+-- The last two run AFTER the code deploy (destructive column drop / one-time
+-- cleanup) — see "Full migration order" in docs/setup/vercel-deploy.md.
 --
 -- Enum-like columns (processing_method, roast_level, brew_method) store canonical
 -- English values; the bilingual "中文 English" display labels live in src/lib/terms.ts.

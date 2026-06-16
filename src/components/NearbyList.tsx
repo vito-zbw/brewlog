@@ -8,7 +8,7 @@ import { formatDistance, haversineKm, type LatLng } from "@/lib/geo";
 function ratingDotClass(maxRating: number | null): string {
   if (maxRating === null) return "bg-warm-gray";
   if (maxRating >= 4) return "bg-sage";
-  if (maxRating >= 3) return "bg-amber-warm";
+  if (maxRating === 3) return "bg-amber-warm";
   return "bg-terracotta";
 }
 

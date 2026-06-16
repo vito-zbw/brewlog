@@ -4,7 +4,7 @@
 
 **BrewLog** is a specialty coffee discovery and review platform — a bean database with café reviews attached. It documents niche coffee beans, logs café visits, and tracks tasting experiences.
 
-The project is built in four phases, each delivering usable functionality. The entire stack uses free tiers only — no paid services.
+The project is built in five phases, each delivering usable functionality. The entire stack uses free tiers only — no paid services.
 
 ## Roadmap
 
@@ -45,9 +45,32 @@ No authentication, no image uploads, no public access. `created_by` / `visited_b
 - "Coffee crawl" feature: multi-café trip reports
 - Community leaderboards (optional): most origins explored, most cafés visited
 
+### Phase 5 — Account Management and CRUD ✅ (shipped)
+
+Built incrementally on top of Phase 4 in response to real usage:
+
+- **Bean CRUD**: create, edit, and delete beans (owner-gated); inline bean creation also lives in the log-a-visit form
+- **Email/password login**: a third sign-in method alongside Google/GitHub, with open self-registration at `/register`. No email verification or password-reset emails — that keeps the stack free (email needs a paid domain); a CLI `npm run reset-password` covers lost passwords. Adds `users.password_hash` (scrypt, per-user salt) via `npm run migrate:phase5`. See `docs/setup/password-auth.md`
+- **Account settings** (`/settings`): change your display name; names are unique case-insensitively (`migrate:username`)
+- **Visit edit/delete**: edit or delete your own visits; deleting a café's last visit garbage-collects the now-orphaned café and its photos (`migrate:orphan-cafes` is the one-time backfill for that cleanup)
+
+### Phase 6 — (proposed) Engagement and Reach
+
+Not yet built — a candidate roadmap for the next round of work. Pick from these based on real usage; all should stay within free-tier services:
+
+- **Notifications**: in-app feed of new followers, follow-backs, and activity from people you follow (in-app only — no email, same $0 constraint as Phase 5 auth)
+- **Comments & reactions**: lightweight comments or a 👍 on visits, beans, and crawls — the first genuinely social write surface beyond follows
+- **Richer discovery**: discrete origin/roaster filter controls (today origin/roaster are reachable only through the combined search box), "similar beans", and map marker clustering as café counts grow
+- **Feed & timeline pagination**: cursor-based pagination for `/feed` and the visit timeline (both currently cap at a fixed `LIMIT` with no offset — fine at present scale, a wall as the followed set grows)
+- **Account hardening**: rate-limiting on login/registration/follow (Vercel WAF or an Upstash free tier) and email-verification gating for OAuth identities — both deferred from Phase 5
+- **PWA / offline logging**: log a visit offline on mobile and sync later
+- **Data export**: let a user download their own visits/beans as JSON/CSV
+
+When building Phase 6, keep the existing conventions: raw SQL in `src/lib/queries/`, owner-gating on every mutation, public-read for viewing, bilingual Chinese-first UI, and migrate-before-push for any schema change.
+
 ## Tech Stack
 
-All services use free tiers. No paid resources required through Phase 4 at small-to-moderate scale.
+All services use free tiers. No paid resources required through Phase 5 at small-to-moderate scale.
 
 | Layer            | Technology               | Free Tier Limits                     | Used From |
 | ---------------- | ------------------------ | ------------------------------------ | --------- |
@@ -60,10 +83,6 @@ All services use free tiers. No paid resources required through Phase 4 at small
 | Image Storage    | Cloudflare R2            | 10GB storage, 10M reads/mo           | Phase 2   |
 | Authentication   | Auth.js (NextAuth.js)    | Free (self-hosted)                   | Phase 3   |
 | Package Manager  | npm                      | —                                    | Phase 1   |
-
-### Why Turso instead of plain SQLite
-
-Plain SQLite stores data in a file on disk, which doesn't work on Vercel (serverless functions run on temporary machines that don't keep files between requests). Turso is cloud-hosted SQLite — the SQL syntax and schema are identical, but the data lives on Turso's servers and is accessed over HTTP. The only code difference is using `@libsql/client` instead of `better-sqlite3`.
 
 ## Project Structure
 
@@ -188,6 +207,11 @@ The full reference with placeholders lives in the committed `.env.example`; setu
   ```
 
   Order matters: migrate first, push second — the old code tolerates extra tables/columns, but new code 500s on missing ones.
+
+  **Full migration order** for upgrading a pre-Phase-3 cloud database to current:
+  `migrate:phase3` → `migrate:phase4` → `migrate:phase5` → `migrate:username` → `migrate:drop-cafe-website` → `migrate:orphan-cafes`. Two scripts break the usual rule and must run AFTER the matching code is deployed, not before:
+  - `migrate:drop-cafe-website` is **destructive** (drops the unused `cafes.website` column) and inverts migrate-first — deploy the code that no longer reads it, then drop.
+  - `migrate:orphan-cafes` is a **one-time real-prod cleanup** that deletes cafés with zero visits (it will remove `seed.sql`'s demo "Something For Café" — expected; never run it against the e2e/test DB).
 - Never run migrations or seeding from app code at startup (same principle as the no-auto-seed rule).
 - Push only when `npm run verify` is fully green (typecheck → lint → build → complete Playwright suite).
 - Secrets live only in `.env.local` (gitignored) and Vercel env vars. `AUTH_DEV_LOGIN` must never be set on Vercel — it would allow passwordless login as any user.
@@ -244,47 +268,13 @@ The full reference with placeholders lives in the committed `.env.example`; setu
   - `POST /api/visits` — create a visit (including visit_beans entries)
 - Return JSON responses with consistent shape: `{ data: ... }` on success, `{ error: "message" }` on failure.
 
-## Predefined Value Lists
-
-### Processing Methods
-水洗 Washed, 日晒 Natural, 蜜处理 Honey, 厌氧发酵 Anaerobic, 湿刨 Wet-hulled, 其他 Other
-
-### Roast Levels
-浅烘 Light, 中浅烘 Medium-Light, 中烘 Medium, 中深烘 Medium-Dark, 深烘 Dark
-
-### Brew Methods
-意式浓缩 Espresso, V60, Chemex, 爱乐压 Aeropress, 法压壶 French Press, 虹吸壶 Siphon, 冷萃 Cold Brew, 摩卡壶 Moka Pot, 滴滤机 Auto Drip, 其他 Other
-
-### Common Tasting Note Tags
-Store as comma-separated strings. Display format is "中文 English". Common tags include but are not limited to:
-果香 Fruity, 莓果 Berry, 柑橘 Citrus, 热带水果 Tropical, 核果 Stone Fruit, 巧克力 Chocolate, 坚果 Nutty, 焦糖 Caramel, 蜂蜜 Honey, 花香 Floral, 香料 Spicy, 泥土 Earthy, 木质 Woody, 草本 Herbal, 甜感 Sweet, 酒香 Winey, 烟熏 Smoky, 香草 Vanilla, 太妃 Toffee, 黄油 Butter
-
-### Users (Phase 1–2 only, before auth)
-Baiwei, Friend1, Friend2
-
 ## Things to Avoid
 
-- Do NOT add authentication until Phase 3. In Phase 1–2, `created_by` / `visited_by` is a plain text string from a fixed list.
 - Do NOT use an ORM (like Prisma or Drizzle). Use raw SQL via `@libsql/client` for simplicity and transparency.
-- Do NOT add image upload until Phase 2.
 - Do NOT use Google Maps. Use Leaflet + OpenStreetMap.
 - Do NOT use `better-sqlite3`. Use `@libsql/client` (Turso's client) so the app works on Vercel's serverless environment.
 - Do NOT over-engineer. If something can be a simple function, don't make it a class. If it can be a single file, don't split it into three.
 - Do NOT commit `.env.local` or any secret tokens.
-
-## Phase-Specific Build Notes
-
-### When building Phase 1
-Focus only on: bean library, café map, visit logging form, visit history. No auth, no images, no social features. Use the mock data from `seed.sql` to populate the database initially.
-
-### When building Phase 2
-Add a `photos` table to the schema. Integrate Cloudflare R2 using the S3-compatible API (the `@aws-sdk/client-s3` package works with R2). Add a dashboard page at the root route. Extend bean, café, and visit detail pages with photo galleries.
-
-### When building Phase 3
-Install `next-auth` and configure providers (Google and/or GitHub). Add a `users` table. Migrate `created_by` / `visited_by` text fields to `user_id` foreign keys with a migration script that maps existing text names to user records. Add user profile pages.
-
-### When building Phase 4
-Add `follows` table (follower_id, following_id). Add activity feed query that pulls visits from followed users. Make bean and café pages publicly accessible (no auth required to view, auth required to post). Add location-based café search using Leaflet's built-in geolocation. Add shareable URLs for visits and bean profiles.
 
 ## Changelog
 
@@ -293,11 +283,18 @@ Add `follows` table (follower_id, following_id). Add activity feed query that pu
 This file replaced the original MVP-only instructions, archived at `CLAUDE.legacy.md` for reference. What changed:
 
 - **Scope**: single MVP spec → four-phase roadmap (Phase 2: photos via Cloudflare R2 + dashboard stats; Phase 3: Auth.js with `user_id` migration; Phase 4: social/public discovery)
-- **Database**: `better-sqlite3` with a local file at `data/brewlog.db` → Turso cloud SQLite via `@libsql/client`, so the app can deploy to Vercel serverless. Queries become async and must be centralized in `src/lib/queries.ts` (legacy kept them in API route files)
+- **Database**: `better-sqlite3` with a local file at `data/brewlog.db` → Turso cloud SQLite via `@libsql/client`, so the app can deploy to Vercel serverless. Queries become async and must be centralized in `src/lib/queries/` (a directory split by domain and re-exported via `index.ts`; the original v2 plan was a single `queries.ts` file, later split — legacy kept queries inline in API route files)
 - **DB initialization**: legacy auto-created and auto-seeded the database on first run → now auto-seeding is forbidden; seed manually via the Turso CLI
 - **Schema/seed location**: `data/schema.sql`, `data/seed.sql` → `schema.sql`, `seed.sql` at project root
 - **UI language**: English → Simplified Chinese with bilingual coffee terminology ("水洗 Washed", Chinese first); predefined value lists are now bilingual and add 湿刨 Wet-hulled, 摩卡壶 Moka Pot, 滴滤机 Auto Drip
 - **Map**: default center Singapore → Guangzhou; pin colors by *average* rating (green ≥4 / amber 3–3.9 / red <3) → by *highest* overall visit rating (green ≥4 / yellow 3 / red ≤2)
 - **Routes**: map page `/map` → `/cafes`; log-a-visit form `/visits/new` → `/log`; new endpoint `GET /api/beans/[id]`
 
-**Resolved as of Phases 1–4 (2026-06).** The legacy-spec drift this note originally described (better-sqlite3 with auto-seed, English UI, Singapore map center, `/map` and `/visits/new` routes) was fully migrated in Phase 1 (`git tag phase-1`); Phases 2–4 then added photos/dashboard/map filters, Auth.js multi-user with `user_id` foreign keys, and the social layer (follows/feed/crawls/leaderboard). The codebase now matches this spec through Phase 4 — treat the code as correct. Access model (owner decision, 2026-06-13): the site is public-read — every viewing page and GET API works without login; login gates only user-specific surfaces (`/log`, `/feed`, crawl authoring, photo upload/delete, personal stats) and all mutations.
+**Resolved as of Phases 1–4 (2026-06).** The legacy-spec drift this note originally described (better-sqlite3 with auto-seed, English UI, Singapore map center, `/map` and `/visits/new` routes) was fully migrated in Phase 1 (`git tag phase-1`); Phases 2–4 then added photos/dashboard/map filters, Auth.js multi-user with `user_id` foreign keys, and the social layer (follows/feed/crawls/leaderboard). The codebase has since advanced beyond Phase 4 into Phase 5 (see the roadmap above) — treat the code as the source of truth. Access model (owner decision, 2026-06-13): the site is public-read — every viewing page and entity GET API works without login; login gates only user-specific surfaces (`/log`, `/feed`, crawl authoring, photo upload/delete, personal stats) and all mutations. Two GETs are deliberately login-gated exceptions: `/api/geocode` (used only by the authed log flow — gating protects the keyless Nominatim proxy from abuse) and the owner-private `/api/users/[id]/followers|following` lists (uniform 401/403, designed so a 404-vs-403 difference can't leak which user ids exist).
+
+### 2026-06-16 — v3: Phase 5 documented + final verification pass
+
+- **Phase 5 added to the roadmap** (bean CRUD, email/password auth + open registration, account settings/unique usernames, visit edit/delete), plus a proposed **Phase 6** outline. The code shipped these incrementally on top of Phase 4; the roadmap and `README.md` now reflect them.
+- **Access-model wording corrected** (above): public-read holds for all viewing pages and entity GET APIs; the deliberate gated-GET exceptions are `/api/geocode` and the owner-private followers/following lists.
+- **Full migration order documented** (see Deployment & Release Rules below and `docs/setup/vercel-deploy.md`): `phase3 → phase4 → phase5 → username → drop-cafe-website → orphan-cafes`. `migrate-drop-cafe-website` is destructive and INVERTS the migrate-first rule (deploy code first); `migrate-orphan-cafes` is a one-time real-prod cleanup that deletes seed.sql's demo café.
+- **Verification**: a full-fleet audit (code/live-site/docs/tests/security/features) found **no critical or high-severity defects**. Applied safe fixes (bean-existence + café/date input validation, `PhotoDeleteButton` error surfacing, an a11y `aria-label` sweep, spec-literal map-pin thresholds) and added e2e coverage (crawl edit/delete owner-gating, `/api/users/[id]/following` gating, `/crawls/[id]` public-read). `npm run verify` is green (typecheck → lint → build → complete Playwright suite).

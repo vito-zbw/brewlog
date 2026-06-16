@@ -6,9 +6,9 @@ import { test, expect } from "../../helpers/fixtures";
 // crawl authoring), the personal /api/stats, and EVERY non-GET API — the
 // proxy answers 401 未登录 before any handler validation runs.
 //
-// /crawls/[id] and /api/crawls/[id] are also public, but no crawl exists yet
-// at this point in the serial run (the seed has none and phase4 specs run
-// later), so the crawl detail pages are covered by the phase4 crawl specs.
+// /crawls/[id] is also public; seed.sql ships crawl id 1 (owned by Friend1),
+// so the logged-out crawl-detail read is asserted here deterministically (the
+// phase4 crawl specs cover the create/edit/delete flows separately).
 const PUBLIC_PAGES = [
   "/",
   "/beans",
@@ -19,6 +19,7 @@ const PUBLIC_PAGES = [
   "/visits/1",
   "/users/1",
   "/crawls",
+  "/crawls/1",
   "/leaderboard",
   "/login",
 ] as const;

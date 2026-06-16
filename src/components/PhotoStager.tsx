@@ -92,6 +92,7 @@ export function PhotoStager({
                 value={photo.caption}
                 onChange={(e) => onCaptionChange(photo.id, e.target.value)}
                 placeholder="照片说明（选填）"
+                aria-label="照片说明"
                 data-testid={tid("staged-photo-caption")}
                 disabled={disabled}
                 className="mt-1 w-full px-2 py-1 text-xs border border-cream-dark rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-terracotta/30"

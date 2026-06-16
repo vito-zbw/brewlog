@@ -365,12 +365,12 @@ export function VisitForm({
         </div>
         {isNewCafe ? (
           <div className="space-y-3">
-            <input type="text" placeholder="店名" data-testid="log-new-cafe-name" value={newCafe.name}
+            <input type="text" placeholder="店名" aria-label="店名" data-testid="log-new-cafe-name" value={newCafe.name}
               onChange={(e) => setNewCafe((p) => ({ ...p, name: e.target.value }))} className={inputClass} required />
             <div className="grid grid-cols-2 gap-3">
               {NEW_CAFE_FIELDS.map((f) => (
                 <input key={f.key} type={f.type}
-                  placeholder={f.placeholder} data-testid={f.testId} value={newCafe[f.key]}
+                  placeholder={f.placeholder} aria-label={f.placeholder} data-testid={f.testId} value={newCafe[f.key]}
                   onChange={(e) => setNewCafe((p) => ({ ...p, [f.key]: e.target.value }))} className={inputClass} required />
               ))}
             </div>

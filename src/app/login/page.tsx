@@ -82,6 +82,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             name="email"
             data-testid="login-email"
             placeholder="邮箱"
+            aria-label="邮箱"
             autoComplete="email"
             className={inputClass}
           />
@@ -90,6 +91,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             name="password"
             data-testid="login-password"
             placeholder="密码"
+            aria-label="密码"
             autoComplete="current-password"
             className={inputClass}
           />

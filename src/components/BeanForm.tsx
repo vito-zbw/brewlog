@@ -199,6 +199,7 @@ export function BeanForm({
         <input
           type="text"
           placeholder="豆名 *"
+          aria-label="豆名"
           data-testid={`${testIdPrefix}-name`}
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -207,6 +208,7 @@ export function BeanForm({
         <input
           type="text"
           placeholder="产地国家 *"
+          aria-label="产地国家"
           data-testid={`${testIdPrefix}-origin`}
           value={origin}
           onChange={(e) => setOrigin(e.target.value)}
@@ -215,6 +217,7 @@ export function BeanForm({
         <input
           type="text"
           placeholder="产区（选填）"
+          aria-label="产区"
           data-testid={`${testIdPrefix}-region`}
           value={region}
           onChange={(e) => setRegion(e.target.value)}
@@ -223,6 +226,7 @@ export function BeanForm({
         <input
           type="text"
           placeholder="庄园（选填）"
+          aria-label="庄园"
           data-testid={`${testIdPrefix}-farm`}
           value={farm}
           onChange={(e) => setFarm(e.target.value)}
@@ -231,6 +235,7 @@ export function BeanForm({
         <input
           type="text"
           placeholder="烘焙商（选填）"
+          aria-label="烘焙商"
           data-testid={`${testIdPrefix}-roaster`}
           value={roaster}
           onChange={(e) => setRoaster(e.target.value)}
@@ -238,6 +243,7 @@ export function BeanForm({
         />
         <select
           data-testid={`${testIdPrefix}-processing`}
+          aria-label="处理法"
           value={processing}
           onChange={(e) => setProcessing(e.target.value)}
           className={inputClass}
@@ -250,6 +256,7 @@ export function BeanForm({
         </select>
         <select
           data-testid={`${testIdPrefix}-roast`}
+          aria-label="烘焙度"
           value={roastLevel}
           onChange={(e) => setRoastLevel(e.target.value)}
           className={inputClass}
@@ -269,6 +276,7 @@ export function BeanForm({
         <p className="text-xs text-warm-gray/70 mb-2">风味描述（选填）</p>
         <textarea
           placeholder="这支豆喝起来怎么样？"
+          aria-label="风味描述"
           data-testid={`${testIdPrefix}-freetext`}
           value={freetext}
           onChange={(e) => setFreetext(e.target.value)}

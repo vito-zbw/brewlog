@@ -72,5 +72,14 @@ test.describe("退出登录", () => {
     // Protected pages still bounce to /login.
     await page.goto("/log");
     await expect(page).toHaveURL(/\/login/);
+
+    // Regression guard (flaky-logout): logout must not leave a live session
+    // cookie behind. The historical flake was the session being resurrected
+    // when a prefetch rotated the JWT; the fix clears the cookie rather than
+    // rotating it, so no authjs.session-token with a value should survive.
+    const liveSession = (await page.context().cookies()).filter(
+      (c) => c.name.includes("authjs.session-token") && c.value
+    );
+    expect(liveSession).toHaveLength(0);
   });
 });

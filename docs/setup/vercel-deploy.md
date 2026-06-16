@@ -113,6 +113,15 @@ TURSO_AUTH_TOKEN="$(turso db tokens create brewlog)" npm run migrate:phase4 -- "
 
 It is idempotent — safe to re-run. Without it, `/crawls`, `/feed`, profile pages and follows will 500 on a Phase 3 database.
 
+**Full migration order 迁移顺序** — to bring a pre-Phase-3 cloud database all the way to current, run in this dependency order (each is idempotent and atomic):
+
+```
+migrate:phase3 → migrate:phase4 → migrate:phase5 → migrate:username → migrate:drop-cafe-website → migrate:orphan-cafes
+```
+
+- `migrate:phase5` adds `users.password_hash` (email/password login — see `docs/setup/password-auth.md`); `migrate:username` adds the unique case-insensitive display-name index used by `/settings`.
+- ⚠️ **Two scripts run AFTER the code deploy, not before** (the reverse of the usual migrate-first rule): `migrate:drop-cafe-website` is destructive (drops the unused `cafes.website` column) — deploy the code that stops reading it first. `migrate:orphan-cafes` is a one-time **real-production** cleanup that deletes visit-less cafés (it removes `seed.sql`'s demo "Something For Café" — expected; never run it against the e2e/test database).
+
 All env vars BrewLog will ever need (also documented in the committed `.env.example`):
 
 | Variable | Phase | Set on Vercel? |

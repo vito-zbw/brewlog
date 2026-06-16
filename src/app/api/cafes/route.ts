@@ -20,9 +20,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "请求格式错误" }, { status: 400 });
     }
     if (
-      !body.name ||
-      !body.city ||
-      !body.country ||
+      typeof body.name !== "string" ||
+      !body.name.trim() ||
+      typeof body.city !== "string" ||
+      !body.city.trim() ||
+      typeof body.country !== "string" ||
+      !body.country.trim() ||
       body.latitude == null ||
       body.longitude == null
     ) {
@@ -45,6 +48,9 @@ export async function POST(request: NextRequest) {
     }
     const cafe = await createCafe({
       ...body,
+      name: body.name.trim(),
+      city: body.city.trim(),
+      country: body.country.trim(),
       latitude: lat,
       longitude: lng,
       user_id: userId,

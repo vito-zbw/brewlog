@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getVisitsWithBeans, createVisit } from "@/lib/queries";
+import { getVisitsWithBeans, createVisit, existingBeanIds } from "@/lib/queries";
 import { requireUserId, UnauthorizedError } from "@/lib/auth-helpers";
 import { validateVisitBody } from "@/lib/visit-validation";
 
@@ -30,6 +30,13 @@ export async function POST(request: NextRequest) {
     const invalid = validateVisitBody(body);
     if (invalid) {
       return NextResponse.json({ error: invalid }, { status: 400 });
+    }
+    const beanIds: number[] = Array.isArray(body.bean_ids) ? body.bean_ids : [];
+    if (beanIds.length > 0) {
+      const existing = await existingBeanIds(beanIds);
+      if (existing.length !== new Set(beanIds).size) {
+        return NextResponse.json({ error: "咖啡豆不存在" }, { status: 400 });
+      }
     }
     const visit = await createVisit({
       ...body,

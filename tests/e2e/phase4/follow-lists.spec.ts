@@ -86,6 +86,16 @@ test.describe("following / followers lists", () => {
     // Another user's list is private.
     const other = await request.get(`/api/users/${FRIEND2_ID}/followers`);
     expect(other.status()).toBe(403);
+
+    // The parallel /following route has identical owner-gating.
+    const ownFollowing = await request.get(
+      `/api/users/${BAIWEI_ID}/following`
+    );
+    expect(ownFollowing.ok()).toBe(true);
+    const otherFollowing = await request.get(
+      `/api/users/${FRIEND2_ID}/following`
+    );
+    expect(otherFollowing.status()).toBe(403);
   });
 });
 
@@ -95,5 +105,7 @@ test.describe("follow lists require login", () => {
   test("list API returns 401 when logged out", async ({ request }) => {
     const res = await request.get(`/api/users/${BAIWEI_ID}/followers`);
     expect(res.status()).toBe(401);
+    const following = await request.get(`/api/users/${BAIWEI_ID}/following`);
+    expect(following.status()).toBe(401);
   });
 });

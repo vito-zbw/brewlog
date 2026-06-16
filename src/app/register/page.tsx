@@ -104,6 +104,7 @@ export default async function RegisterPage({ searchParams }: RegisterPageProps) 
             name="name"
             data-testid="register-name"
             placeholder="昵称"
+            aria-label="昵称"
             autoComplete="nickname"
             className={inputClass}
           />
@@ -112,6 +113,7 @@ export default async function RegisterPage({ searchParams }: RegisterPageProps) 
             name="email"
             data-testid="register-email"
             placeholder="邮箱"
+            aria-label="邮箱"
             autoComplete="email"
             className={inputClass}
           />
@@ -120,6 +122,7 @@ export default async function RegisterPage({ searchParams }: RegisterPageProps) 
             name="password"
             data-testid="register-password"
             placeholder="密码（至少 8 位）"
+            aria-label="密码"
             autoComplete="new-password"
             className={inputClass}
           />
@@ -128,6 +131,7 @@ export default async function RegisterPage({ searchParams }: RegisterPageProps) 
             name="confirm"
             data-testid="register-confirm"
             placeholder="确认密码"
+            aria-label="确认密码"
             autoComplete="new-password"
             className={inputClass}
           />

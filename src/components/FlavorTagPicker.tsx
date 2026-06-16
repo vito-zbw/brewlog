@@ -58,6 +58,7 @@ export function FlavorTagPicker({ value, onChange }: FlavorTagPickerProps) {
             }
           }}
           placeholder="添加自定义标签…"
+          aria-label="添加自定义标签"
           data-testid="flavor-custom-input"
           className="flex-1 px-3 py-1.5 text-sm border border-cream-dark rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-terracotta/30"
         />

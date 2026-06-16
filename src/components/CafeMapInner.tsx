@@ -13,7 +13,7 @@ interface CafeMapInnerProps {
 function getRatingColor(maxRating: number | null): string {
   if (maxRating === null) return "#8B7D72";
   if (maxRating >= 4) return "#7A9B76";
-  if (maxRating >= 3) return "#D4A24E";
+  if (maxRating === 3) return "#D4A24E";
   return "#C4704B";
 }
 

@@ -16,9 +16,12 @@ These docs cover the **interactive browser/account setups that cannot be automat
 | [`vercel-deploy.md`](./vercel-deploy.md) | Vercel hosting + env vars | End of Phase 1; redeploy at the end of each phase | No |
 | [`r2-setup.md`](./r2-setup.md) | Cloudflare R2 photo storage | Phase 2 deploy | No |
 | [`oauth-setup.md`](./oauth-setup.md) | Google + GitHub login (Auth.js) | Phase 3 | No (dev login covers local) |
+| [`password-auth.md`](./password-auth.md) | Email/password login (open registration) | Phase 5; run `migrate:phase5` before deploy | No (no new env var) |
 | [`custom-domain.md`](./custom-domain.md) | Custom domain + HTTPS on Vercel | Phase 3, optional | No |
 
 **Phase 4 第四阶段:** no new cloud services are needed. But when redeploying Phase 4 over an existing cloud database, run the `migrate:phase4` migration first — see the "Phase upgrades 数据库升级" note in [`vercel-deploy.md`](./vercel-deploy.md). Since Phase 4 the deployed site is **public-read**: anyone can browse without an account; login is only needed for posting and personal stats.
+
+**Phase 5 第五阶段:** still no new cloud services. Adds bean CRUD, account settings, visit edit/delete, and an optional email/password login (open registration) — set up via [`password-auth.md`](./password-auth.md). Run `npm run migrate:phase5` then `migrate:username` on the cloud DB before pushing Phase 5 code; see the full migration order in [`vercel-deploy.md`](./vercel-deploy.md).
 
 ## Recommended Order 推荐顺序
 
@@ -26,7 +29,8 @@ These docs cover the **interactive browser/account setups that cannot be automat
 2. `vercel-deploy.md` — first deploy
 3. *(Phase 2)* `r2-setup.md` — photo storage
 4. *(Phase 3)* `oauth-setup.md` — real login
-5. *(Phase 3, optional)* `custom-domain.md` — custom domain
+5. *(Phase 5, optional)* `password-auth.md` — email/password sign-in
+6. *(Phase 3, optional)* `custom-domain.md` — custom domain
 
 ## Master Environment Variable Table 环境变量总表
 
