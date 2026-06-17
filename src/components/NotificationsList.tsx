@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { NotificationView } from "@/types";
 import {
   NOTIFICATION_EVENT_LABELS,
@@ -39,9 +40,18 @@ export function NotificationsList({
 }: {
   initial: { notifications: NotificationView[]; nextCursor: string | null };
 }) {
+  const router = useRouter();
   const [items, setItems] = useState(initial.notifications);
   const [nextCursor, setNextCursor] = useState(initial.nextCursor);
   const [loading, setLoading] = useState(false);
+
+  // The /notifications page marks everything read server-side before render, so
+  // refresh once on mount to re-run the layout (and reseed the nav bell badge to
+  // zero) instead of waiting for the bell's 30s poll — matters for soft navs,
+  // where the preserved root layout wouldn't otherwise re-render.
+  useEffect(() => {
+    router.refresh();
+  }, [router]);
 
   async function loadMore() {
     if (!nextCursor || loading) return;

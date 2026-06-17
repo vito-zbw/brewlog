@@ -10,6 +10,14 @@ import { useEffect, useState } from "react";
 export function NotificationBell({ initialCount }: { initialCount: number }) {
   const [count, setCount] = useState(initialCount);
 
+  // Reseed when the server hands down a fresh count (e.g. after a layout
+  // re-render triggered by router.refresh() once notifications are read) —
+  // useState ignores prop changes on its own, which would otherwise leave the
+  // badge stale until the next poll.
+  useEffect(() => {
+    setCount(initialCount);
+  }, [initialCount]);
+
   useEffect(() => {
     let active = true;
     async function poll() {

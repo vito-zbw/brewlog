@@ -30,8 +30,14 @@ export async function getUserExport(
 
 function csvCell(value: unknown): string {
   const s = value == null ? "" : String(value);
-  // Quote when the cell contains a comma, quote, or newline; double inner quotes.
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  // Neutralize spreadsheet formula injection: a cell beginning with = + - @ (or
+  // a leading tab/CR) is evaluated as a formula by Excel/Sheets, so prefix a
+  // single quote to force it to be read as text.
+  const guarded = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
+  // Quote per RFC 4180 when the cell contains a quote, comma, CR, or LF.
+  return /[",\r\n]/.test(guarded)
+    ? `"${guarded.replace(/"/g, '""')}"`
+    : guarded;
 }
 
 /** Flattens visits to a CSV table (one row per visit; beans joined by "; "). */

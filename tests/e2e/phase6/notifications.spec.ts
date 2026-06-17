@@ -160,6 +160,39 @@ test.describe("notifications", () => {
     expect((await request.delete(`/api/visits/${visitId}`)).status()).toBe(200);
   });
 
+  test("un-reacting retracts its notification (so a re-like can re-notify)", async ({
+    request,
+    browser,
+  }) => {
+    const visitId = await createVisit(request); // Baiwei's visit
+    const { ctx, request: friend2 } = await friend2Context(browser);
+
+    expect(
+      (
+        await friend2.post("/api/reactions", {
+          data: { resourceType: "visit", resourceId: visitId },
+        })
+      ).status()
+    ).toBe(200);
+    expect(
+      (await notificationsFor(request)).some(
+        (n) => n.event_type === "reaction" && n.resource_id === visitId
+      )
+    ).toBe(true);
+
+    expect(
+      (await friend2.delete(`/api/reactions?type=visit&id=${visitId}`)).status()
+    ).toBe(200);
+    expect(
+      (await notificationsFor(request)).some(
+        (n) => n.event_type === "reaction" && n.resource_id === visitId
+      )
+    ).toBe(false);
+
+    await ctx.close();
+    expect((await request.delete(`/api/visits/${visitId}`)).status()).toBe(200);
+  });
+
   test("acting on your own content never notifies yourself", async ({
     request,
   }) => {

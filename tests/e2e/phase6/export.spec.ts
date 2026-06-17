@@ -42,6 +42,35 @@ test.describe("data export", () => {
     expect(body).toContain("visit_date,cafe_name,cafe_city,brew_method");
   });
 
+  test("CSV export neutralizes formula injection in free text", async ({
+    request,
+  }) => {
+    const create = await request.post("/api/visits", {
+      data: {
+        cafe_id: 1,
+        visit_date: "2026-06-16",
+        brew_method: "V60",
+        rating_overall: 5,
+        rating_bean_quality: 5,
+        rating_barista_skill: 5,
+        rating_ambiance: 5,
+        notes: "=SUM(A1:A9)",
+      },
+    });
+    expect(create.status()).toBe(201);
+    const visitId = ((await create.json()) as { data: { id: number } }).data.id;
+
+    const csv = await (
+      await request.get("/api/users/1/export?format=csv")
+    ).text();
+    // The dangerous note is defused with a leading single quote, never written
+    // as a bare leading "=" that a spreadsheet would evaluate.
+    expect(csv).toContain("'=SUM(A1:A9)");
+    expect(csv).not.toMatch(/(^|,)=SUM\(A1:A9\)/m);
+
+    await request.delete(`/api/visits/${visitId}`);
+  });
+
   test("exporting another user's data is forbidden (403)", async ({
     request,
   }) => {
