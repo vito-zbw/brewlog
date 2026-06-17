@@ -1,4 +1,4 @@
-import type { APIRequestContext, Locator, Page } from "@playwright/test";
+import type { APIRequestContext, Page } from "@playwright/test";
 import { test, expect } from "../../helpers/fixtures";
 import { SEED } from "../../helpers/seed";
 
@@ -18,11 +18,13 @@ async function fetchCafes(request: APIRequestContext): Promise<CafeRow[]> {
   return json.data;
 }
 
-// Markers outside the current viewport render as attached-but-hidden
-// `d="M0 0"` paths, so all counting goes through expect.poll on the attached
-// count — never visibility of arbitrary markers.
-function markers(page: Page): Locator {
-  return page.locator("path.leaflet-interactive");
+// Markers cluster at the default zoom (and off-viewport ones render as
+// attached-but-hidden), so counting marker DOM nodes is unreliable. The map
+// surfaces the rendered (filtered) café count as a deterministic element —
+// assert on that instead.
+async function markerCount(page: Page): Promise<number> {
+  const text = await page.getByTestId("cafe-marker-count").textContent();
+  return parseInt(text ?? "0", 10);
 }
 
 test.describe("map filters (/cafes)", () => {
@@ -31,28 +33,26 @@ test.describe("map filters (/cafes)", () => {
     await expect(page.locator(".leaflet-container")).toBeVisible();
   });
 
-  test("baseline: one attached marker per café, at least the seed count", async ({
+  test("baseline: rendered count is at least the seed total", async ({
     page,
   }) => {
     // Phase 1 specs added a 广州 café, so the count is >= the seed total.
-    await expect
-      .poll(() => markers(page).count())
-      .toBeGreaterThanOrEqual(SEED.cafeCount);
+    await expect.poll(() => markerCount(page)).toBeGreaterThanOrEqual(
+      SEED.cafeCount
+    );
   });
 
   test("city filter narrows to 深圳 and resets back to all", async ({
     page,
   }) => {
     await page.getByTestId("map-filter-city").selectOption("深圳");
-    // Seed has exactly 2 深圳 cafés and no spec creates more. Both sit
-    // outside the default Guangzhou viewport (attached but hidden), so only
-    // the attached count is asserted.
-    await expect.poll(() => markers(page).count()).toBe(2);
+    // Seed has exactly 2 深圳 cafés and no spec creates more.
+    await expect.poll(() => markerCount(page)).toBe(2);
 
     await page.getByTestId("map-filter-city").selectOption("");
-    await expect
-      .poll(() => markers(page).count())
-      .toBeGreaterThanOrEqual(SEED.cafeCount);
+    await expect.poll(() => markerCount(page)).toBeGreaterThanOrEqual(
+      SEED.cafeCount
+    );
   });
 
   test("rating filter shows exactly the cafés with max_rating >= 4", async ({
@@ -61,7 +61,7 @@ test.describe("map filters (/cafes)", () => {
   }) => {
     const cafes = await fetchCafes(request);
     const baseline = cafes.length;
-    await expect.poll(() => markers(page).count()).toBe(baseline);
+    await expect.poll(() => markerCount(page)).toBe(baseline);
 
     const expected = cafes.filter(
       (c) => c.max_rating !== null && c.max_rating >= 4
@@ -71,7 +71,7 @@ test.describe("map filters (/cafes)", () => {
     expect(expected).toBeLessThan(baseline);
 
     await page.getByTestId("map-filter-rating").selectOption("4");
-    await expect.poll(() => markers(page).count()).toBe(expected);
+    await expect.poll(() => markerCount(page)).toBe(expected);
   });
 
   test("combined city + rating filter leaves only %Arabica in 深圳", async ({
@@ -81,7 +81,7 @@ test.describe("map filters (/cafes)", () => {
     await page.getByTestId("map-filter-rating").selectOption("4");
     // Of the two 深圳 cafés, only "%Arabica 深业上城店" has max_rating 4;
     // "Something For Café" has no visits and is filtered out.
-    await expect.poll(() => markers(page).count()).toBe(1);
+    await expect.poll(() => markerCount(page)).toBe(1);
   });
 
   test("brew filter matches cafés whose brew_methods include Espresso", async ({
@@ -90,13 +90,14 @@ test.describe("map filters (/cafes)", () => {
   }) => {
     const cafes = await fetchCafes(request);
     const expected = cafes.filter(
-      (c) => c.brew_methods !== null && c.brew_methods.split(",").includes("Espresso")
+      (c) =>
+        c.brew_methods !== null && c.brew_methods.split(",").includes("Espresso")
     ).length;
     // Friend2's seed visits guarantee Espresso at ".jpg coffee" and
     // "%Arabica 深业上城店"; earlier specs may have added more.
     expect(expected).toBeGreaterThanOrEqual(2);
 
     await page.getByTestId("map-filter-brew").selectOption("Espresso");
-    await expect.poll(() => markers(page).count()).toBe(expected);
+    await expect.poll(() => markerCount(page)).toBe(expected);
   });
 });

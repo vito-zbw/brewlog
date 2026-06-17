@@ -15,13 +15,27 @@ function extractTags(beans: Bean[]): string[] {
   ).sort();
 }
 
+function extractOrigins(beans: Bean[]): string[] {
+  return Array.from(new Set(beans.map((b) => b.origin_country).filter(Boolean))).sort();
+}
+
+function extractRoasters(beans: Bean[]): string[] {
+  return Array.from(
+    new Set(beans.map((b) => b.roaster?.trim()).filter((r): r is string => !!r))
+  ).sort();
+}
+
 export default function BeansPage() {
   const [beans, setBeans] = useState<Bean[]>([]);
   const [allTags, setAllTags] = useState<string[]>([]);
+  const [allOrigins, setAllOrigins] = useState<string[]>([]);
+  const [allRoasters, setAllRoasters] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [processing, setProcessing] = useState("");
   const [roastLevel, setRoastLevel] = useState("");
   const [tag, setTag] = useState("");
+  const [origin, setOrigin] = useState("");
+  const [roaster, setRoaster] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,7 +47,10 @@ export default function BeansPage() {
         const res = await fetch("/api/beans", { signal: controller.signal });
         if (!res.ok) return;
         const json: { data?: Bean[]; error?: string } = await res.json();
-        setAllTags(extractTags(json.data ?? []));
+        const all = json.data ?? [];
+        setAllTags(extractTags(all));
+        setAllOrigins(extractOrigins(all));
+        setAllRoasters(extractRoasters(all));
       } catch {
         // 标签选项加载失败时保持为空，不影响列表展示
       }
@@ -52,6 +69,8 @@ export default function BeansPage() {
       if (processing) params.set("processing", processing);
       if (roastLevel) params.set("roast_level", roastLevel);
       if (tag) params.set("tag", tag);
+      if (origin) params.set("origin", origin);
+      if (roaster) params.set("roaster", roaster);
 
       try {
         const res = await fetch(`/api/beans?${params.toString()}`, {
@@ -73,7 +92,7 @@ export default function BeansPage() {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [search, processing, roastLevel, tag]);
+  }, [search, processing, roastLevel, tag, origin, roaster]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -82,7 +101,7 @@ export default function BeansPage() {
       </h1>
 
       <div className="bg-white rounded-xl shadow-sm border border-cream-dark/50 p-4 mb-8">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <input
             type="text"
             value={search}
@@ -91,6 +110,32 @@ export default function BeansPage() {
             data-testid="bean-search"
             className="px-4 py-2 border border-cream-dark rounded-lg bg-cream/50 focus:outline-none focus:ring-2 focus:ring-terracotta/30 text-sm"
           />
+          <select
+            value={origin}
+            onChange={(e) => setOrigin(e.target.value)}
+            data-testid="bean-filter-origin"
+            className="px-4 py-2 border border-cream-dark rounded-lg bg-cream/50 focus:outline-none focus:ring-2 focus:ring-terracotta/30 text-sm"
+          >
+            <option value="">全部产地</option>
+            {allOrigins.map((o) => (
+              <option key={o} value={o}>
+                {o}
+              </option>
+            ))}
+          </select>
+          <select
+            value={roaster}
+            onChange={(e) => setRoaster(e.target.value)}
+            data-testid="bean-filter-roaster"
+            className="px-4 py-2 border border-cream-dark rounded-lg bg-cream/50 focus:outline-none focus:ring-2 focus:ring-terracotta/30 text-sm"
+          >
+            <option value="">全部烘焙商</option>
+            {allRoasters.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+          </select>
           <select
             value={processing}
             onChange={(e) => setProcessing(e.target.value)}

@@ -70,11 +70,13 @@ test.describe("咖啡豆库 /beans", () => {
       page.getByRole("heading", { name: SEED.knownBeanName })
     ).toBeVisible();
 
-    // Bilingual attribute labels and values.
-    await expect(page.getByText("处理法", { exact: true })).toBeVisible();
-    await expect(page.getByText("烘焙度", { exact: true })).toBeVisible();
-    await expect(page.getByText("水洗 Washed", { exact: true })).toBeVisible();
-    await expect(page.getByText("浅烘 Light", { exact: true })).toBeVisible();
+    // Bilingual attribute labels and values — scoped to the detail card, since
+    // the similar-beans section below also renders processing/roast chips.
+    const detail = page.getByTestId("bean-detail");
+    await expect(detail.getByText("处理法", { exact: true })).toBeVisible();
+    await expect(detail.getByText("烘焙度", { exact: true })).toBeVisible();
+    await expect(detail.getByText("水洗 Washed", { exact: true })).toBeVisible();
+    await expect(detail.getByText("浅烘 Light", { exact: true })).toBeVisible();
 
     // Visits section: heading count is >= 1 and the known seeded visit
     // (at .jpg coffee) is listed.
