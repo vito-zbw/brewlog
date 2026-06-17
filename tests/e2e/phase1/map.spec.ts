@@ -2,20 +2,27 @@ import type { Locator, Page } from "@playwright/test";
 import { test, expect } from "../../helpers/fixtures";
 import { SEED } from "../../helpers/seed";
 
-// Markers cluster at the default zoom. Click a cluster to zoom to its members
-// (zoomToBoundsOnClick), revealing individual divIcon markers, then click one
-// to open its popup. When markers are already un-clustered, the cluster step is
-// simply skipped.
+// Markers cluster at the default zoom. Zoom in via the (reliable) zoom-in
+// control until past disableClusteringAtZoom (13): every café then renders as an
+// individual divIcon marker, still within the city viewport. Then click one to
+// open its popup. Robust to however many cafés other specs have added (clicking
+// a cluster element directly is flaky — Leaflet's zoom-to-bounds handler doesn't
+// always fire from a synthetic click).
 async function openFirstMarkerPopup(page: Page): Promise<Locator> {
-  const cluster = page.locator(".marker-cluster").filter({ visible: true });
-  if ((await cluster.count()) > 0) {
-    await cluster.first().click();
-  }
-  const marker = page
+  const individual = page
     .locator(".leaflet-marker-icon:not(.marker-cluster)")
     .filter({ visible: true });
-  await expect(marker.first()).toBeVisible();
-  await marker.first().click();
+  const zoomIn = page.getByRole("button", { name: "Zoom in" });
+  for (let i = 0; i < 4; i++) {
+    if ((await individual.count()) > 0) break;
+    await zoomIn.click();
+    await individual
+      .first()
+      .waitFor({ state: "visible", timeout: 2000 })
+      .catch(() => {});
+  }
+  await expect(individual.first()).toBeVisible();
+  await individual.first().click();
   const popup = page.getByTestId("cafe-popup");
   await expect(popup).toBeVisible();
   return popup;
