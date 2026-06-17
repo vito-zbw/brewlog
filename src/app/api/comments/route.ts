@@ -3,7 +3,9 @@ import {
   listComments,
   createComment,
   socialEntityExists,
+  socialEntityOwner,
   isSocialResourceType,
+  createNotification,
 } from "@/lib/queries";
 import { requireUserId, UnauthorizedError } from "@/lib/auth-helpers";
 
@@ -52,6 +54,18 @@ export async function POST(request: NextRequest) {
       user_id: userId,
       body: text,
     });
+    // Notify the resource owner (skip self-comments). Each comment is a
+    // distinct event, so no dedupe.
+    const ownerId = await socialEntityOwner(type, resourceId);
+    if (ownerId !== null && ownerId !== userId) {
+      await createNotification({
+        userId: ownerId,
+        actorId: userId,
+        eventType: "comment",
+        resourceType: type,
+        resourceId,
+      });
+    }
     return NextResponse.json({ data: comment }, { status: 201 });
   } catch (err) {
     if (err instanceof UnauthorizedError) {

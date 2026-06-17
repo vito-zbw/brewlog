@@ -5,12 +5,16 @@ import { mapRows, firstRow } from "./util";
 export async function follow(
   followerId: number,
   followingId: number
-): Promise<void> {
-  await db.execute({
+): Promise<{ created: boolean }> {
+  // Returns whether a NEW follow row was inserted (vs. an idempotent no-op when
+  // already following) so the caller only fans out a notification on a genuine
+  // first-time follow.
+  const rs = await db.execute({
     sql: `INSERT INTO follows (follower_id, following_id) VALUES (?, ?)
           ON CONFLICT(follower_id, following_id) DO NOTHING`,
     args: [followerId, followingId],
   });
+  return { created: rs.rowsAffected > 0 };
 }
 
 export async function unfollow(

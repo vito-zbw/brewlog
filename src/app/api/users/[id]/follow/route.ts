@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
-import { follow, unfollow, getUserById } from "@/lib/queries";
+import {
+  follow,
+  unfollow,
+  getUserById,
+  isFollowing,
+  createNotification,
+} from "@/lib/queries";
 import { requireUserId, UnauthorizedError } from "@/lib/auth-helpers";
 
 type Params = { params: Promise<{ id: string }> };
@@ -21,7 +27,18 @@ export async function POST(_request: Request, { params }: Params) {
     if (targetId === userId) {
       return NextResponse.json({ error: "不能关注自己" }, { status: 400 });
     }
-    await follow(userId, targetId);
+    const { created } = await follow(userId, targetId);
+    if (created) {
+      // follow_back when the recipient (targetId) already follows the actor
+      // (userId); otherwise a plain new-follower event.
+      const back = await isFollowing(targetId, userId);
+      await createNotification({
+        userId: targetId,
+        actorId: userId,
+        eventType: back ? "follow_back" : "follow",
+        dedupe: true,
+      });
+    }
     return NextResponse.json({ data: { following: true } });
   } catch (err) {
     if (err instanceof UnauthorizedError) {

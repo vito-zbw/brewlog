@@ -60,6 +60,23 @@ export const TASTING_TAGS: readonly string[] = [
   "黄油 Butter",
 ];
 
+// Notification event → the verb phrase shown after the actor's name, e.g.
+// "Baiwei 关注了你" / "Baiwei 评论了你的探店记录". comment/reaction phrases are
+// completed with the resource label below.
+export const NOTIFICATION_EVENT_LABELS: Record<string, string> = {
+  follow: "关注了你",
+  follow_back: "回关了你",
+  comment: "评论了你的",
+  reaction: "赞了你的",
+};
+
+// Social resource type → its Chinese-first display noun.
+export const RESOURCE_TYPE_LABELS: Record<string, string> = {
+  visit: "探店记录",
+  bean: "咖啡豆",
+  crawl: "咖啡之旅",
+};
+
 export function optionLabel(
   options: readonly BilingualOption[],
   value: string
