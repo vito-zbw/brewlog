@@ -85,7 +85,14 @@ export function optionLabel(
 }
 
 export function formatVisitDate(date: string): string {
-  return new Date(date).toLocaleDateString("zh-CN", {
+  // SQLite CURRENT_TIMESTAMP is a zoneless UTC string ("YYYY-MM-DD HH:MM:SS").
+  // JS parses a space-separated datetime as LOCAL time, which can shift the
+  // rendered calendar day. Treat such timestamps as UTC. Plain dates
+  // ("YYYY-MM-DD", e.g. visit_date) don't match and are left untouched.
+  const normalized = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(date)
+    ? date.replace(" ", "T") + "Z"
+    : date;
+  return new Date(normalized).toLocaleDateString("zh-CN", {
     year: "numeric",
     month: "long",
     day: "numeric",

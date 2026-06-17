@@ -103,6 +103,28 @@ export async function getUnreadCount(userId: number): Promise<number> {
   );
 }
 
+/**
+ * Removes the 'reaction' notification a like generated, when that like is
+ * retracted (un-react). Precise: there is at most one reaction per
+ * (actor, resource), so this matches exactly the one notification — no
+ * over-delete. Also lets a later re-like re-notify (the dedupe in
+ * createNotification keys on the same tuple, so a lingering row would otherwise
+ * freeze the inbox entry).
+ */
+export async function removeReactionNotification(
+  ownerId: number,
+  actorId: number,
+  resourceType: SocialResourceType,
+  resourceId: number
+): Promise<void> {
+  await db.execute({
+    sql: `DELETE FROM notifications
+          WHERE user_id = ? AND actor_id = ? AND event_type = 'reaction'
+            AND resource_type = ? AND resource_id = ?`,
+    args: [ownerId, actorId, resourceType, resourceId],
+  });
+}
+
 export async function markAllRead(userId: number): Promise<void> {
   await db.execute({
     sql: "UPDATE notifications SET read_at = CURRENT_TIMESTAMP WHERE user_id = ? AND read_at IS NULL",

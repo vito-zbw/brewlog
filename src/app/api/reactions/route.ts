@@ -7,6 +7,7 @@ import {
   socialEntityOwner,
   isSocialResourceType,
   createNotification,
+  removeReactionNotification,
 } from "@/lib/queries";
 import { requireUserId, UnauthorizedError } from "@/lib/auth-helpers";
 
@@ -59,6 +60,12 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "请求参数错误" }, { status: 400 });
     }
     await removeReaction(userId, type, resourceId);
+    // Retract the notification this like generated, so the owner's inbox isn't
+    // left asserting a like that no longer exists (and a re-like can re-notify).
+    const ownerId = await socialEntityOwner(type, resourceId);
+    if (ownerId !== null && ownerId !== userId) {
+      await removeReactionNotification(ownerId, userId, type, resourceId);
+    }
     const summary = await getReactionSummary(type, resourceId, userId);
     return NextResponse.json({ data: summary });
   } catch (err) {
