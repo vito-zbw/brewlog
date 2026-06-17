@@ -227,3 +227,80 @@ export interface NewVisitInput {
 
 /** Fields editable on an existing visit (ownership/user_id never changes). */
 export type UpdateVisitInput = Omit<NewVisitInput, "user_id">;
+
+// ── Phase 6: Engagement & Reach ──────────────────────────────────────────────
+
+/**
+ * The social objects that comments, reactions, and notifications attach to.
+ * Polymorphic by (resource_type, resource_id) — no cross-table FK (libsql can't
+ * enforce one); the table is resolved from a fixed map keyed by this validated
+ * enum (see src/lib/queries/social-entities.ts), never from request input.
+ */
+export type SocialResourceType = "visit" | "bean" | "crawl";
+
+export interface Comment {
+  id: number;
+  resource_type: SocialResourceType;
+  resource_id: number;
+  user_id: number;
+  body: string;
+  created_at: string;
+}
+
+/** A comment joined with its author, for display. */
+export interface CommentView extends Comment {
+  user_name: string;
+  user_image: string | null;
+}
+
+/** Aggregate 👍 state for one resource (+ whether the viewer reacted). */
+export interface ReactionSummary {
+  count: number;
+  reacted: boolean;
+}
+
+export type NotificationEventType =
+  | "follow"
+  | "follow_back"
+  | "comment"
+  | "reaction";
+
+export interface Notification {
+  id: number;
+  user_id: number; // recipient
+  event_type: NotificationEventType;
+  actor_id: number; // who triggered it
+  resource_type: SocialResourceType | null; // null for follow / follow_back
+  resource_id: number | null;
+  read_at: string | null; // null = unread
+  created_at: string;
+}
+
+/** A notification joined with its actor, for display. */
+export interface NotificationView extends Notification {
+  actor_name: string;
+  actor_image: string | null;
+}
+
+/**
+ * Keyset cursor for the notifications feed: the (created_at, id) of the last
+ * row on a page. Mirrors VisitCursor's role for notifications (ordered by
+ * created_at DESC, id DESC). Serialized via encodeKeysetCursor in src/lib/cursor.ts.
+ */
+export interface NotificationCursor {
+  createdAt: string;
+  id: number;
+}
+
+export interface NotificationsPage {
+  notifications: NotificationView[];
+  nextCursor: NotificationCursor | null;
+}
+
+/** A user's self-service data export (visits + beans they own). */
+export interface UserExport {
+  exportedAt: string;
+  user: { id: number; name: string };
+  visits: VisitWithDetails[];
+  beans: Bean[];
+}
