@@ -69,6 +69,31 @@ export default async function SettingsPage() {
           </div>
         </dl>
       </section>
+
+      <section className={cardClass} data-testid="data-export">
+        <h2 className={headingClass}>导出我的数据 Export</h2>
+        <p className="text-sm text-warm-gray mb-4">
+          下载你的探店记录与咖啡豆数据，随时备份。
+        </p>
+        <div className="flex flex-wrap gap-3">
+          <a
+            href={`/api/users/${user.id}/export?format=json`}
+            download
+            data-testid="export-json"
+            className="px-4 py-2 rounded-lg border border-cream-dark text-sm text-espresso hover:bg-cream transition-colors"
+          >
+            下载 JSON
+          </a>
+          <a
+            href={`/api/users/${user.id}/export?format=csv`}
+            download
+            data-testid="export-csv"
+            className="px-4 py-2 rounded-lg border border-cream-dark text-sm text-espresso hover:bg-cream transition-colors"
+          >
+            下载 CSV（探店记录）
+          </a>
+        </div>
+      </section>
     </div>
   );
 }
