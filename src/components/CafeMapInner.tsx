@@ -62,8 +62,14 @@ export function CafeMapInner({ cafes }: CafeMapInnerProps) {
         />
         {/* Cluster nearby cafés as density grows. Clicking a cluster zooms to
             its members (zoomToBoundsOnClick, default); individual markers keep
-            their rating-colored dot + popup. */}
-        <MarkerClusterGroup chunkedLoading showCoverageOnHover={false}>
+            their rating-colored dot + popup. disableClusteringAtZoom=13 means
+            the default city view (zoom 12) clusters, but a single zoom-in fully
+            un-clusters — so a cluster click reliably reveals individual markers. */}
+        <MarkerClusterGroup
+          chunkedLoading
+          showCoverageOnHover={false}
+          disableClusteringAtZoom={13}
+        >
           {cafes.map((cafe) => (
             <Marker
               key={cafe.id}

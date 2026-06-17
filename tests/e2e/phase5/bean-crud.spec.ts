@@ -132,17 +132,20 @@ test.describe("咖啡豆 创建 — 完整字段 + 照片（log 表单）", () =
     const beanId = await beanIdByName(request, name);
     await page.goto(`/beans/${beanId}`);
     await expect(page.getByRole("heading", { name })).toBeVisible();
-    await expect(page.getByText("庄园", { exact: true })).toBeVisible();
-    await expect(page.getByText(farm, { exact: true })).toBeVisible();
-    await expect(page.getByText(freetext)).toBeVisible();
-    await expect(page.getByText("日晒 Natural", { exact: true })).toBeVisible();
+    // Scope attribute/photo assertions to the detail card — the similar-beans
+    // section below renders other beans' processing/roast chips too.
+    const detail = page.getByTestId("bean-detail");
+    await expect(detail.getByText("庄园", { exact: true })).toBeVisible();
+    await expect(detail.getByText(farm, { exact: true })).toBeVisible();
+    await expect(detail.getByText(freetext)).toBeVisible();
+    await expect(detail.getByText("日晒 Natural", { exact: true })).toBeVisible();
     await expect(
-      page.getByText("中浅烘 Medium-Light", { exact: true })
+      detail.getByText("中浅烘 Medium-Light", { exact: true })
     ).toBeVisible();
     await expect
-      .poll(() => page.getByTestId("gallery-image").count())
+      .poll(() => detail.getByTestId("gallery-image").count())
       .toBe(2);
-    await expect(page.getByText("拉花")).toBeVisible();
+    await expect(detail.getByText("拉花")).toBeVisible();
   });
 
   test("a failed photo upload keeps the form; retry succeeds without duplicating the bean", async ({
