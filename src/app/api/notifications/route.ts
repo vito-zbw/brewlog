@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getNotifications } from "@/lib/queries";
+import { getNotifications, clearNotifications } from "@/lib/queries";
 import { requireUserId, UnauthorizedError } from "@/lib/auth-helpers";
 import { decodeKeysetCursor, encodeKeysetCursor } from "@/lib/cursor";
 
@@ -26,5 +26,20 @@ export async function GET(request: NextRequest) {
     }
     console.error("GET /api/notifications failed:", err);
     return NextResponse.json({ error: "加载通知失败" }, { status: 500 });
+  }
+}
+
+// Clears all of the caller's notifications (session-scoped).
+export async function DELETE() {
+  try {
+    const userId = await requireUserId();
+    await clearNotifications(userId);
+    return NextResponse.json({ data: { ok: true } });
+  } catch (err) {
+    if (err instanceof UnauthorizedError) {
+      return NextResponse.json({ error: "未登录" }, { status: 401 });
+    }
+    console.error("DELETE /api/notifications failed:", err);
+    return NextResponse.json({ error: "清除通知失败" }, { status: 500 });
   }
 }

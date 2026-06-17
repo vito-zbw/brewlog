@@ -242,6 +242,99 @@ test.describe("notifications", () => {
     await ctx.close();
   });
 
+  test("deleting one notification removes only that one (owner-scoped)", async ({
+    request,
+    browser,
+  }) => {
+    const { ctx, request: friend2 } = await friend2Context(browser);
+    await resetFollows(request, friend2);
+    expect((await friend2.post(`/api/users/${BAIWEI}/follow`)).status()).toBe(
+      200
+    );
+
+    const target = (await notificationsFor(request)).find(
+      (n) => n.event_type === "follow" && n.actor_id === FRIEND2
+    );
+    expect(target).toBeTruthy();
+
+    expect(
+      (await request.delete(`/api/notifications/${target!.id}`)).status()
+    ).toBe(200);
+    expect(
+      (await notificationsFor(request)).some((n) => n.id === target!.id)
+    ).toBe(false);
+
+    await resetFollows(request, friend2);
+    await ctx.close();
+  });
+
+  test("a non-owner cannot delete your notification (404)", async ({
+    request,
+    browser,
+  }) => {
+    const { ctx, request: friend2 } = await friend2Context(browser);
+    await resetFollows(request, friend2);
+    expect((await friend2.post(`/api/users/${BAIWEI}/follow`)).status()).toBe(
+      200
+    );
+
+    const target = (await notificationsFor(request)).find(
+      (n) => n.actor_id === FRIEND2
+    );
+    expect(target).toBeTruthy();
+
+    // Friend2 is not the recipient → owner-scoped delete returns 404.
+    expect(
+      (await friend2.delete(`/api/notifications/${target!.id}`)).status()
+    ).toBe(404);
+    expect(
+      (await notificationsFor(request)).some((n) => n.id === target!.id)
+    ).toBe(true);
+
+    await request.delete(`/api/notifications/${target!.id}`); // cleanup
+    await resetFollows(request, friend2);
+    await ctx.close();
+  });
+
+  test("dismiss one and clear all from the /notifications page", async ({
+    page,
+    request,
+    browser,
+  }) => {
+    const { ctx, request: friend2 } = await friend2Context(browser);
+    await resetFollows(request, friend2);
+    const visitId = await createVisit(request); // Baiwei's
+    expect((await friend2.post(`/api/users/${BAIWEI}/follow`)).status()).toBe(
+      200
+    );
+    expect(
+      (
+        await friend2.post("/api/comments", {
+          data: { resourceType: "visit", resourceId: visitId, body: "hi" },
+        })
+      ).status()
+    ).toBe(201);
+
+    await page.goto("/notifications");
+    const items = page.getByTestId("notification-item");
+    await expect.poll(() => items.count()).toBeGreaterThanOrEqual(2);
+    const initial = await items.count();
+
+    // Dismiss one via its ✕.
+    await items.first().getByTestId("notification-delete").click();
+    await expect.poll(() => items.count()).toBe(initial - 1);
+
+    // Clear all (confirm dialog auto-accepted) → empty state.
+    page.on("dialog", (d) => d.accept());
+    await page.getByTestId("notifications-clear-all").click();
+    await expect(page.getByTestId("notifications-empty")).toBeVisible();
+
+    // Reset follows (uses the friend2 context) BEFORE closing it.
+    await resetFollows(request, friend2);
+    await ctx.close();
+    expect((await request.delete(`/api/visits/${visitId}`)).status()).toBe(200);
+  });
+
   test.describe("logged out", () => {
     test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -251,6 +344,8 @@ test.describe("notifications", () => {
         (await request.get("/api/notifications/unread-count")).status()
       ).toBe(401);
       expect((await request.post("/api/notifications/read")).status()).toBe(401);
+      expect((await request.delete("/api/notifications")).status()).toBe(401);
+      expect((await request.delete("/api/notifications/1")).status()).toBe(401);
     });
   });
 });

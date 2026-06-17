@@ -74,6 +74,50 @@ export function NotificationsList({
     }
   }
 
+  async function dismiss(id: number) {
+    // Optimistic: drop it now. On failure re-insert ONLY this row (in keyset
+    // order) via a functional update — reverting the whole render-time snapshot
+    // would resurrect rows that other concurrent dismisses already removed.
+    const removed = items.find((n) => n.id === id);
+    setItems((cur) => cur.filter((n) => n.id !== id));
+    const restore = () =>
+      setItems((cur) =>
+        !removed || cur.some((n) => n.id === removed.id)
+          ? cur
+          : [...cur, removed].sort((a, b) =>
+              a.created_at < b.created_at
+                ? 1
+                : a.created_at > b.created_at
+                  ? -1
+                  : b.id - a.id
+            )
+      );
+    try {
+      const res = await fetch(`/api/notifications/${id}`, { method: "DELETE" });
+      if (!res.ok) restore();
+    } catch {
+      restore();
+    }
+  }
+
+  async function clearAll() {
+    if (!window.confirm("确定清除所有通知吗？此操作不可撤销。")) return;
+    const prev = items;
+    const prevCursor = nextCursor;
+    setItems([]);
+    setNextCursor(null);
+    const revert = () => {
+      setItems(prev);
+      setNextCursor(prevCursor); // restore the cursor too, else 加载更多 vanishes
+    };
+    try {
+      const res = await fetch("/api/notifications", { method: "DELETE" });
+      if (!res.ok) revert();
+    } catch {
+      revert();
+    }
+  }
+
   if (items.length === 0) {
     return (
       <p
@@ -86,57 +130,84 @@ export function NotificationsList({
   }
 
   return (
-    <div className="space-y-2">
-      {items.map((n) => (
-        <Link
-          key={n.id}
-          href={linkFor(n)}
-          data-testid="notification-item"
-          className={`flex items-center gap-3 p-4 rounded-xl border transition-colors hover:border-terracotta ${
-            n.read_at
-              ? "bg-white border-cream-dark/50"
-              : "bg-sage/5 border-sage/30"
-          }`}
-        >
-          {n.actor_image ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={n.actor_image}
-              alt={n.actor_name}
-              className="h-9 w-9 rounded-full shrink-0"
-            />
-          ) : (
-            <span className="h-9 w-9 rounded-full bg-terracotta text-cream flex items-center justify-center text-sm font-semibold shrink-0">
-              {n.actor_name.charAt(0)}
-            </span>
-          )}
-          <div className="flex-1 min-w-0">
-            <p className="text-sm text-espresso">
-              <span className="font-medium">{n.actor_name}</span> {sentence(n)}
-            </p>
-            <p className="text-xs text-warm-gray/70">
-              {formatVisitDate(n.created_at)}
-            </p>
-          </div>
-          {!n.read_at && (
-            <span
-              data-testid="notification-unread-dot"
-              className="h-2 w-2 rounded-full bg-terracotta shrink-0"
-            />
-          )}
-        </Link>
-      ))}
-      {nextCursor && (
+    <div>
+      <div className="flex justify-end mb-3">
         <button
           type="button"
-          data-testid="load-more"
-          onClick={loadMore}
-          disabled={loading}
-          className="w-full px-6 py-3 bg-terracotta hover:bg-terracotta-light text-cream rounded-xl text-sm font-medium transition-colors shadow-sm disabled:opacity-60"
+          onClick={clearAll}
+          data-testid="notifications-clear-all"
+          className="text-sm text-warm-gray hover:text-terracotta transition-colors"
         >
-          {loading ? "加载中…" : "加载更多"}
+          全部清除
         </button>
-      )}
+      </div>
+
+      <div className="space-y-2">
+        {items.map((n) => (
+          <div
+            key={n.id}
+            data-testid="notification-item"
+            className={`flex items-center gap-3 p-4 rounded-xl border transition-colors ${
+              n.read_at
+                ? "bg-white border-cream-dark/50"
+                : "bg-sage/5 border-sage/30"
+            }`}
+          >
+            <Link
+              href={linkFor(n)}
+              className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80 transition-opacity"
+            >
+              {n.actor_image ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={n.actor_image}
+                  alt={n.actor_name}
+                  className="h-9 w-9 rounded-full shrink-0"
+                />
+              ) : (
+                <span className="h-9 w-9 rounded-full bg-terracotta text-cream flex items-center justify-center text-sm font-semibold shrink-0">
+                  {n.actor_name.charAt(0)}
+                </span>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-espresso">
+                  <span className="font-medium">{n.actor_name}</span>{" "}
+                  {sentence(n)}
+                </p>
+                <p className="text-xs text-warm-gray/70">
+                  {formatVisitDate(n.created_at)}
+                </p>
+              </div>
+            </Link>
+            {!n.read_at && (
+              <span
+                data-testid="notification-unread-dot"
+                className="h-2 w-2 rounded-full bg-terracotta shrink-0"
+              />
+            )}
+            <button
+              type="button"
+              onClick={() => dismiss(n.id)}
+              data-testid="notification-delete"
+              aria-label="删除通知"
+              className="shrink-0 px-2 text-warm-gray/60 hover:text-terracotta transition-colors text-lg leading-none"
+            >
+              &times;
+            </button>
+          </div>
+        ))}
+        {nextCursor && (
+          <button
+            type="button"
+            data-testid="load-more"
+            onClick={loadMore}
+            disabled={loading}
+            className="w-full px-6 py-3 bg-terracotta hover:bg-terracotta-light text-cream rounded-xl text-sm font-medium transition-colors shadow-sm disabled:opacity-60"
+          >
+            {loading ? "加载中…" : "加载更多"}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

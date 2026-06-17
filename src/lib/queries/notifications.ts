@@ -131,3 +131,27 @@ export async function markAllRead(userId: number): Promise<void> {
     args: [userId],
   });
 }
+
+/**
+ * Deletes one of the recipient's own notifications. Scoped by user_id in the
+ * WHERE so it can only ever remove the caller's own row — returns false (→ 404)
+ * when nothing matched, without revealing whether the id exists for someone else.
+ */
+export async function deleteNotification(
+  id: number,
+  userId: number
+): Promise<boolean> {
+  const rs = await db.execute({
+    sql: "DELETE FROM notifications WHERE id = ? AND user_id = ?",
+    args: [id, userId],
+  });
+  return rs.rowsAffected > 0;
+}
+
+/** Clears all of the recipient's notifications. */
+export async function clearNotifications(userId: number): Promise<void> {
+  await db.execute({
+    sql: "DELETE FROM notifications WHERE user_id = ?",
+    args: [userId],
+  });
+}
