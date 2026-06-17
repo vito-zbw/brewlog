@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
-import { getCrawlWithStops } from "@/lib/queries";
+import { getCrawlWithStops, getReactionSummary } from "@/lib/queries";
 import { formatVisitDate } from "@/lib/terms";
 import { ShareLinkButton } from "@/components/ShareLinkButton";
 import { VisitCard } from "@/components/VisitCard";
+import { EngagementSection } from "@/components/EngagementSection";
 
 export const dynamic = "force-dynamic";
 
@@ -25,9 +26,14 @@ export default async function CrawlDetailPage({
   }
 
   const session = await auth();
-  const isOwner =
-    typeof session?.user?.id === "number" &&
-    session.user.id === crawl.user_id;
+  const currentUserId =
+    typeof session?.user?.id === "number" ? session.user.id : null;
+  const isOwner = currentUserId === crawl.user_id;
+  const reaction = await getReactionSummary(
+    "crawl",
+    crawl.id,
+    currentUserId ?? undefined
+  );
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -78,6 +84,13 @@ export default async function CrawlDetailPage({
           </p>
         )}
       </div>
+
+      <EngagementSection
+        resourceType="crawl"
+        resourceId={crawl.id}
+        currentUserId={currentUserId}
+        initialReaction={reaction}
+      />
 
       <div className="space-y-6">
         {crawl.stops.map((stop, index) => (

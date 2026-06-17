@@ -127,6 +127,19 @@ export async function deleteCrawl(id: number): Promise<void> {
       sql: "DELETE FROM crawl_visits WHERE crawl_id = ?",
       args: [id],
     });
+    // Phase 6 social rows attached to this crawl (manual cascade — no FK).
+    await tx.execute({
+      sql: "DELETE FROM comments WHERE resource_type = 'crawl' AND resource_id = ?",
+      args: [id],
+    });
+    await tx.execute({
+      sql: "DELETE FROM reactions WHERE resource_type = 'crawl' AND resource_id = ?",
+      args: [id],
+    });
+    await tx.execute({
+      sql: "DELETE FROM notifications WHERE resource_type = 'crawl' AND resource_id = ?",
+      args: [id],
+    });
     await tx.execute({ sql: "DELETE FROM crawls WHERE id = ?", args: [id] });
     await tx.commit();
   } finally {

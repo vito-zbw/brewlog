@@ -9,3 +9,5 @@ export * from "./users";
 export * from "./social";
 export * from "./crawls";
 export * from "./social-entities";
+export * from "./comments";
+export * from "./reactions";

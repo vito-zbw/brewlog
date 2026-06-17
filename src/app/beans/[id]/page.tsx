@@ -1,12 +1,18 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/auth";
-import { getBeanWithVisits, getSimilarBeans, listPhotos } from "@/lib/queries";
+import {
+  getBeanWithVisits,
+  getSimilarBeans,
+  getReactionSummary,
+  listPhotos,
+} from "@/lib/queries";
 import { PROCESSING_METHODS, ROAST_LEVELS, optionLabel } from "@/lib/terms";
 import { PhotoGallery } from "@/components/PhotoGallery";
 import { ShareLinkButton } from "@/components/ShareLinkButton";
 import { VisitCard } from "@/components/VisitCard";
 import { BeanCard } from "@/components/BeanCard";
+import { EngagementSection } from "@/components/EngagementSection";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +36,13 @@ export default async function BeanDetailPage({
   const similarBeans = await getSimilarBeans(bean.id);
   const session = await auth();
   const isOwner = session?.user?.id === bean.user_id;
+  const currentUserId =
+    typeof session?.user?.id === "number" ? session.user.id : null;
+  const reaction = await getReactionSummary(
+    "bean",
+    bean.id,
+    currentUserId ?? undefined
+  );
 
   const tags =
     bean.tasting_notes_tags
@@ -163,6 +176,13 @@ export default async function BeanDetailPage({
           <PhotoGallery photos={photos} canDelete={false} />
         </div>
       </div>
+
+      <EngagementSection
+        resourceType="bean"
+        resourceId={bean.id}
+        currentUserId={currentUserId}
+        initialReaction={reaction}
+      />
 
       <h2 className="text-2xl font-bold font-[Playfair_Display] text-espresso mb-4">
         包含此豆的探店记录（{visits.length}）
