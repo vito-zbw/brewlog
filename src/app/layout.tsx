@@ -4,6 +4,8 @@ import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { signOut } from "@/auth";
 import { getCurrentUser } from "@/lib/auth-helpers";
+import { getUnreadCount } from "@/lib/queries";
+import { NotificationBell } from "@/components/NotificationBell";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -45,6 +47,7 @@ export default async function RootLayout({
   // DB row (not the JWT) so a renamed name or changed avatar shows immediately
   // after router.refresh(). Logged-out (or pre-Phase-3 id-less tokens) → null.
   const user = await getCurrentUser();
+  const unreadCount = user ? await getUnreadCount(user.id) : 0;
   return (
     <html lang="zh-CN">
       <head>
@@ -90,6 +93,7 @@ export default async function RootLayout({
                 </Link>
                 {user ? (
                   <>
+                    <NotificationBell initialCount={unreadCount} />
                     <Link
                       href={`/users/${user.id}`}
                       data-testid="nav-profile"

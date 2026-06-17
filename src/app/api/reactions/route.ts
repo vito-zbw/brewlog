@@ -4,7 +4,9 @@ import {
   removeReaction,
   getReactionSummary,
   socialEntityExists,
+  socialEntityOwner,
   isSocialResourceType,
+  createNotification,
 } from "@/lib/queries";
 import { requireUserId, UnauthorizedError } from "@/lib/auth-helpers";
 
@@ -20,7 +22,22 @@ export async function POST(request: NextRequest) {
     if (!(await socialEntityExists(type, resourceId))) {
       return NextResponse.json({ error: "未找到该内容" }, { status: 404 });
     }
-    await addReaction(userId, type, resourceId);
+    const { created } = await addReaction(userId, type, resourceId);
+    if (created) {
+      // Notify the resource owner on a genuine first-time like (skip self).
+      // dedupe so a like→unlike→like cycle doesn't re-notify.
+      const ownerId = await socialEntityOwner(type, resourceId);
+      if (ownerId !== null && ownerId !== userId) {
+        await createNotification({
+          userId: ownerId,
+          actorId: userId,
+          eventType: "reaction",
+          resourceType: type,
+          resourceId,
+          dedupe: true,
+        });
+      }
+    }
     const summary = await getReactionSummary(type, resourceId, userId);
     return NextResponse.json({ data: summary });
   } catch (err) {
