@@ -386,6 +386,19 @@ export async function deleteVisit(
       sql: "DELETE FROM crawl_visits WHERE visit_id = ?",
       args: [id],
     });
+    // Phase 6 social rows attached to this visit (manual cascade — no FK).
+    await tx.execute({
+      sql: "DELETE FROM comments WHERE resource_type = 'visit' AND resource_id = ?",
+      args: [id],
+    });
+    await tx.execute({
+      sql: "DELETE FROM reactions WHERE resource_type = 'visit' AND resource_id = ?",
+      args: [id],
+    });
+    await tx.execute({
+      sql: "DELETE FROM notifications WHERE resource_type = 'visit' AND resource_id = ?",
+      args: [id],
+    });
 
     // Renumber each affected crawl's remaining stops to a gap-free 1..n order.
     // Runs after the deleted visit's row is gone, so the correlated count

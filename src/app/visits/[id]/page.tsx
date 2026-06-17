@@ -1,11 +1,12 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/auth";
-import { getVisitWithBeans, listPhotos } from "@/lib/queries";
+import { getVisitWithBeans, getReactionSummary, listPhotos } from "@/lib/queries";
 import { BREW_METHODS, formatVisitDate, optionLabel } from "@/lib/terms";
 import { RatingBeans } from "@/components/RatingBeans";
 import { PhotoGallery } from "@/components/PhotoGallery";
 import { ShareLinkButton } from "@/components/ShareLinkButton";
+import { EngagementSection } from "@/components/EngagementSection";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,13 @@ export default async function VisitDetailPage({
   const photos = await listPhotos("visit", visitId);
   const session = await auth();
   const isOwner = session?.user?.id === visit.user_id;
+  const currentUserId =
+    typeof session?.user?.id === "number" ? session.user.id : null;
+  const reaction = await getReactionSummary(
+    "visit",
+    visitId,
+    currentUserId ?? undefined
+  );
 
   const ratings = [
     { label: "总体评分", value: visit.rating_overall },
@@ -137,10 +145,17 @@ export default async function VisitDetailPage({
       <h2 className="text-2xl font-bold font-[Playfair_Display] text-espresso mb-4">
         照片
       </h2>
-      <div className="space-y-4">
+      <div className="space-y-4 mb-8">
         {/* Photos are managed from the edit form now; the detail page is view-only. */}
         <PhotoGallery photos={photos} canDelete={false} />
       </div>
+
+      <EngagementSection
+        resourceType="visit"
+        resourceId={visitId}
+        currentUserId={currentUserId}
+        initialReaction={reaction}
+      />
     </div>
   );
 }

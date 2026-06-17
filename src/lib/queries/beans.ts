@@ -240,6 +240,19 @@ export async function deleteBean(
       sql: "DELETE FROM photos WHERE entity_type = 'bean' AND entity_id = ?",
       args: [id],
     });
+    // Phase 6 social rows attached to this bean (manual cascade — no FK).
+    await tx.execute({
+      sql: "DELETE FROM comments WHERE resource_type = 'bean' AND resource_id = ?",
+      args: [id],
+    });
+    await tx.execute({
+      sql: "DELETE FROM reactions WHERE resource_type = 'bean' AND resource_id = ?",
+      args: [id],
+    });
+    await tx.execute({
+      sql: "DELETE FROM notifications WHERE resource_type = 'bean' AND resource_id = ?",
+      args: [id],
+    });
     await tx.execute({ sql: "DELETE FROM beans WHERE id = ?", args: [id] });
     await tx.commit();
     return { photoKeys };
