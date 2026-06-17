@@ -104,6 +104,44 @@ CREATE TABLE IF NOT EXISTS crawl_visits (
     PRIMARY KEY (crawl_id, visit_id)
 );
 
+-- Phase 6: comments, reactions, notifications. comments/reactions attach
+-- polymorphically to visits/beans/crawls via (resource_type, resource_id) — no
+-- cross-table FK (libsql can't enforce one); the table is resolved from a fixed
+-- map keyed by the validated resource_type (src/lib/queries/social-entities.ts).
+CREATE TABLE IF NOT EXISTS comments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    resource_type TEXT NOT NULL CHECK(resource_type IN ('visit','bean','crawl')),
+    resource_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    body TEXT NOT NULL,                          -- flat, single-level (no threading)
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- A single 👍-style like per (user, resource). Composite PK prevents duplicates;
+-- pure junction, no surrogate id (mirrors follows / visit_beans).
+CREATE TABLE IF NOT EXISTS reactions (
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    resource_type TEXT NOT NULL CHECK(resource_type IN ('visit','bean','crawl')),
+    resource_id INTEGER NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, resource_type, resource_id)
+);
+
+-- Directed-event notifications (new follower, follow-back, comment-on-yours,
+-- reaction-on-yours). user_id = recipient, actor_id = who triggered it.
+-- resource_type/resource_id are NULL for follow/follow_back. read_at NULL = unread.
+CREATE TABLE IF NOT EXISTS notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    event_type TEXT NOT NULL CHECK(event_type IN ('follow','follow_back','comment','reaction')),
+    actor_id INTEGER NOT NULL REFERENCES users(id),
+    resource_type TEXT CHECK(resource_type IN ('visit','bean','crawl')),
+    resource_id INTEGER,
+    read_at DATETIME,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CHECK (actor_id <> user_id)
+);
+
 -- Indexes for common query patterns
 CREATE INDEX IF NOT EXISTS idx_beans_origin ON beans(origin_country);
 CREATE INDEX IF NOT EXISTS idx_beans_roaster ON beans(roaster);
@@ -120,6 +158,11 @@ CREATE INDEX IF NOT EXISTS idx_visits_date_id ON visits(visit_date DESC, id DESC
 CREATE INDEX IF NOT EXISTS idx_photos_entity ON photos(entity_type, entity_id);
 CREATE INDEX IF NOT EXISTS idx_follows_following ON follows(following_id);
 CREATE INDEX IF NOT EXISTS idx_crawls_user ON crawls(user_id);
+-- Phase 6 lookup indexes: comments/reactions by their target, notifications by
+-- recipient in (created_at DESC, id DESC) keyset order.
+CREATE INDEX IF NOT EXISTS idx_comments_resource ON comments(resource_type, resource_id, created_at, id);
+CREATE INDEX IF NOT EXISTS idx_reactions_resource ON reactions(resource_type, resource_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, created_at DESC, id DESC);
 -- Display names are unique across users (case-insensitive: NOCASE folds ASCII
 -- only, so CJK names compare exactly). Enforced from the settings feature on.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_name_nocase ON users(name COLLATE NOCASE);
