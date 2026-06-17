@@ -2,19 +2,28 @@ import type { Locator, Page } from "@playwright/test";
 import { test, expect } from "../../helpers/fixtures";
 import { SEED } from "../../helpers/seed";
 
-// Cafés outside the default Guangzhou viewport (Shenzhen, Kyoto) render as
-// empty `d="M0 0"` paths — attached but hidden — so marker interaction must
-// filter to visible ones. Markers can also overlap at city zoom, so we click
-// the first visible one with force and keep popup assertions café-generic.
+// Markers cluster at the default zoom. Click a cluster to zoom to its members
+// (zoomToBoundsOnClick), revealing individual divIcon markers, then click one
+// to open its popup. When markers are already un-clustered, the cluster step is
+// simply skipped.
 async function openFirstMarkerPopup(page: Page): Promise<Locator> {
-  const visibleMarkers = page
-    .locator("path.leaflet-interactive")
+  const cluster = page.locator(".marker-cluster").filter({ visible: true });
+  if ((await cluster.count()) > 0) {
+    await cluster.first().click();
+  }
+  const marker = page
+    .locator(".leaflet-marker-icon:not(.marker-cluster)")
     .filter({ visible: true });
-  await expect(visibleMarkers.first()).toBeVisible();
-  await visibleMarkers.first().click({ force: true });
+  await expect(marker.first()).toBeVisible();
+  await marker.first().click();
   const popup = page.getByTestId("cafe-popup");
   await expect(popup).toBeVisible();
   return popup;
+}
+
+async function markerCount(page: Page): Promise<number> {
+  const text = await page.getByTestId("cafe-marker-count").textContent();
+  return parseInt(text ?? "0", 10);
 }
 
 test.describe("café map (/cafes)", () => {
@@ -27,16 +36,17 @@ test.describe("café map (/cafes)", () => {
     await expect(page.locator(".leaflet-container")).toBeVisible();
   });
 
-  test("shows at least one marker per seeded café", async ({ page }) => {
-    const markers = page.locator("path.leaflet-interactive");
-    // Off-viewport cafés are attached but hidden, so poll the attached count
-    // instead of asserting visibility; other specs may have added cafés, so
+  test("renders a marker or cluster for every seeded café", async ({ page }) => {
+    // Markers cluster, so per-café marker DOM nodes don't exist at default zoom;
+    // assert the rendered count element instead. Other specs may add cafés, so
     // never assert an exact count.
-    await expect
-      .poll(() => markers.count())
-      .toBeGreaterThanOrEqual(SEED.cafeCount);
-    // The Guangzhou cluster must actually be visible at the default view.
-    await expect(markers.filter({ visible: true }).first()).toBeVisible();
+    await expect.poll(() => markerCount(page)).toBeGreaterThanOrEqual(
+      SEED.cafeCount
+    );
+    // Something is actually drawn on the map (a cluster bubble or a marker).
+    await expect(
+      page.locator(".marker-cluster, .leaflet-marker-icon").first()
+    ).toBeVisible();
   });
 
   test("legend is visible and explains the unvisited (gray) state", async ({

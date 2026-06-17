@@ -11,6 +11,8 @@ export async function GET(request: NextRequest) {
       processing: params.get("processing") ?? undefined,
       roastLevel: params.get("roast_level") ?? undefined,
       tag: params.get("tag") ?? undefined,
+      originCountry: params.get("origin") ?? undefined,
+      roaster: params.get("roaster") ?? undefined,
     });
     return NextResponse.json({ data: beans });
   } catch (err) {

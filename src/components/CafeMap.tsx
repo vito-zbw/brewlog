@@ -138,6 +138,14 @@ export function CafeMap() {
             无法获取位置，请检查浏览器定位权限。
           </span>
         )}
+        {/* Rendered marker count — deterministic for filter verification (the
+            map DOM clusters markers, so counting marker elements is unreliable). */}
+        <span
+          data-testid="cafe-marker-count"
+          className="ml-auto text-sm text-warm-gray"
+        >
+          {filteredCafes.length} 家咖啡馆
+        </span>
       </div>
       {panelOpen && coords && (
         <div className="px-4 py-2 bg-white border-b border-cream-dark/50">

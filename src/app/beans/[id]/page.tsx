@@ -1,11 +1,12 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/auth";
-import { getBeanWithVisits, listPhotos } from "@/lib/queries";
+import { getBeanWithVisits, getSimilarBeans, listPhotos } from "@/lib/queries";
 import { PROCESSING_METHODS, ROAST_LEVELS, optionLabel } from "@/lib/terms";
 import { PhotoGallery } from "@/components/PhotoGallery";
 import { ShareLinkButton } from "@/components/ShareLinkButton";
 import { VisitCard } from "@/components/VisitCard";
+import { BeanCard } from "@/components/BeanCard";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,7 @@ export default async function BeanDetailPage({
   }
 
   const photos = await listPhotos("bean", bean.id);
+  const similarBeans = await getSimilarBeans(bean.id);
   const session = await auth();
   const isOwner = session?.user?.id === bean.user_id;
 
@@ -51,7 +53,10 @@ export default async function BeanDetailPage({
         &larr; 返回咖啡豆库
       </Link>
 
-      <div className="bg-white rounded-xl shadow-sm border border-cream-dark/50 p-8 mb-8">
+      <div
+        data-testid="bean-detail"
+        className="bg-white rounded-xl shadow-sm border border-cream-dark/50 p-8 mb-8"
+      >
         <div className="flex items-start justify-between gap-3 mb-2">
           <h1 className="text-3xl font-bold font-[Playfair_Display] text-espresso">
             {bean.name}
@@ -173,6 +178,19 @@ export default async function BeanDetailPage({
             <VisitCard key={visit.id} visit={visit} />
           ))}
         </div>
+      )}
+
+      {similarBeans.length > 0 && (
+        <section data-testid="similar-beans" className="mt-10">
+          <h2 className="text-2xl font-bold font-[Playfair_Display] text-espresso mb-4">
+            相似咖啡豆 Similar Beans
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {similarBeans.map((b) => (
+              <BeanCard key={b.id} bean={b} />
+            ))}
+          </div>
+        </section>
       )}
     </div>
   );

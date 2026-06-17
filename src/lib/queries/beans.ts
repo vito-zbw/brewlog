@@ -13,6 +13,8 @@ export interface BeanFilters {
   processing?: string;
   roastLevel?: string;
   tag?: string;
+  originCountry?: string;
+  roaster?: string;
 }
 
 export async function listBeans(filters: BeanFilters = {}): Promise<Bean[]> {
@@ -36,9 +38,75 @@ export async function listBeans(filters: BeanFilters = {}): Promise<Bean[]> {
     sql += " AND tasting_notes_tags LIKE ?";
     args.push(`%${filters.tag}%`);
   }
+  // Discrete origin/roaster controls use exact equality (vs. the free-text
+  // `search` box's LIKE). Both apply together (AND) when set. Backed by
+  // idx_beans_origin / idx_beans_roaster.
+  if (filters.originCountry) {
+    sql += " AND origin_country = ?";
+    args.push(filters.originCountry);
+  }
+  if (filters.roaster) {
+    sql += " AND roaster = ?";
+    args.push(filters.roaster);
+  }
   sql += " ORDER BY created_at DESC";
 
   return mapRows<Bean>(await db.execute({ sql, args }));
+}
+
+/**
+ * Beans similar to the given one, by weighted attribute overlap. No similarity
+ * table — scored in JS over the (small) catalog: same origin country (+3), same
+ * roaster (+3), same roast level (+1), same processing method (+1), and each
+ * shared tasting tag (+1, capped at +3). Returns the top `limit` with score > 0,
+ * most-similar first. Candidates are pre-ordered created_at DESC and Array.sort
+ * is stable, so recency breaks score ties.
+ */
+export async function getSimilarBeans(
+  beanId: number,
+  limit = 4
+): Promise<Bean[]> {
+  const target = await getBean(beanId);
+  if (!target) return [];
+  const candidates = mapRows<Bean>(
+    await db.execute({
+      sql: "SELECT * FROM beans WHERE id <> ? ORDER BY created_at DESC",
+      args: [beanId],
+    })
+  );
+  const targetTags = tagSet(target.tasting_notes_tags);
+  return candidates
+    .map((bean) => ({ bean, score: similarityScore(target, bean, targetTags) }))
+    .filter((s) => s.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map((s) => s.bean);
+}
+
+function tagSet(tags: string | null): Set<string> {
+  return new Set(
+    (tags ?? "")
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean)
+  );
+}
+
+function similarityScore(
+  target: Bean,
+  other: Bean,
+  targetTags: Set<string>
+): number {
+  let score = 0;
+  if (other.origin_country === target.origin_country) score += 3;
+  if (target.roaster && other.roaster === target.roaster) score += 3;
+  if (other.roast_level === target.roast_level) score += 1;
+  if (other.processing_method === target.processing_method) score += 1;
+  let shared = 0;
+  for (const tag of tagSet(other.tasting_notes_tags)) {
+    if (targetTags.has(tag)) shared++;
+  }
+  return score + Math.min(shared, 3);
 }
 
 export async function getBean(id: number): Promise<Bean | null> {
