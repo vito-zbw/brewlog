@@ -54,19 +54,21 @@ Built incrementally on top of Phase 4 in response to real usage:
 - **Account settings** (`/settings`): change your display name; names are unique case-insensitively (`migrate:username`)
 - **Visit edit/delete**: edit or delete your own visits; deleting a café's last visit garbage-collects the now-orphaned café and its photos (`migrate:orphan-cafes` is the one-time backfill for that cleanup)
 
-### Phase 6 — (proposed) Engagement and Reach
+### Phase 6 — Engagement and Reach
 
-Not yet built — a candidate roadmap for the next round of work. Pick from these based on real usage; all should stay within free-tier services:
+Built incrementally on top of Phase 4/5. Four features shipped; account hardening and offline logging remain deferred. All stay within free-tier services. Schema change applied via `npm run migrate:phase6` (adds `comments`, `reactions`, `notifications`).
 
-- **Notifications**: in-app feed of new followers, follow-backs, and activity from people you follow (in-app only — no email, same $0 constraint as Phase 5 auth)
-- **Comments & reactions**: lightweight comments or a 👍 on visits, beans, and crawls — the first genuinely social write surface beyond follows
-- **Richer discovery**: discrete origin/roaster filter controls (today origin/roaster are reachable only through the combined search box), "similar beans", and map marker clustering as café counts grow
-- **Feed & timeline pagination** ✅ (shipped): keyset (cursor) pagination for `/feed` and the `/visits` timeline. Both now order by the date the visit happened, with a stable `id` tiebreaker, render a `加载更多` button. Replaced the old split: `/feed` capped at `LIMIT 50` (silent truncation) and `/visits` was unbounded (fetched every visit).
-- **Account hardening**: rate-limiting on login/registration/follow (Vercel WAF or an Upstash free tier) and email-verification gating for OAuth identities — both deferred from Phase 5
-- **PWA / offline logging**: log a visit offline on mobile and sync later
-- **Data export**: let a user download their own visits/beans as JSON/CSV
+- **Notifications** ✅ (shipped): in-app, **directed events only** — new follower, follow-back, comment-on-your-content, reaction-on-your-content. Activity from people you follow stays in `/feed` (no per-visit fan-out). Nav bell with an unread badge (server-seeded + 30s poll) → `/notifications` page (keyset-paginated, marks read on view). In-app only, no email. Tables: `notifications` (recipient `user_id`, `actor_id`, `event_type`, polymorphic `resource_type`/`resource_id`, `read_at`). Fan-out from the follow/comment/reaction write sites; reactions/follows dedupe.
+- **Comments & reactions** ✅ (shipped): **flat** comments + a single 👍 like on **visits, beans, crawls** (shared target set). Polymorphic `(resource_type, resource_id)` like `photos` (fixed-map guard in `src/lib/queries/social-entities.ts`); public GET, login-gated writes; author-only comment delete; reactions are a composite-PK junction. Deleting a visit/bean/crawl manually cascades its comments/reactions/notifications. Mounted via `EngagementSection` on the three detail pages.
+- **Richer discovery** ✅ (shipped): discrete origin/roaster `<select>` filters on `/beans` (alongside the free-text search, AND-combined), a "相似咖啡豆 Similar Beans" section on bean detail (weighted attribute overlap, no new table), and café-map marker clustering (`react-leaflet-cluster` + divIcon markers; `disableClusteringAtZoom=13` so the city view clusters and one zoom-in reveals individuals).
+- **Data export** ✅ (shipped): a user downloads **their own** visits + beans as JSON (full bundle) or CSV (flat visits table) from `/settings`. `GET /api/users/[id]/export` is login-gated and self-scoped (403 otherwise). CSV defuses spreadsheet formula injection and is RFC-4180 quoted (UTF-8 BOM for Excel CJK).
+- **Feed & timeline pagination** ✅ (shipped): keyset (cursor) pagination for `/feed` and the `/visits` timeline. Both order by the date the visit happened, with a stable `id` tiebreaker, render a `加载更多` button.
+- **Account hardening** (deferred): rate-limiting on login/registration/follow (Vercel WAF or an Upstash free tier) and email-verification gating for OAuth identities — including the new comment/reaction write surfaces, which currently have no rate limiting.
+- **PWA / offline logging** (deferred): log a visit offline on mobile and sync later.
 
-When building Phase 6, keep the existing conventions: raw SQL in `src/lib/queries/`, owner-gating on every mutation, public-read for viewing, bilingual Chinese-first UI, and migrate-before-push for any schema change.
+**Known low-severity trade-offs (accepted at current 3-user scale, from the Phase 6 adversarial review):** deleting a single *comment* leaves its notification (links still resolve to the valid resource page; a precise fix needs a `comment_id` column on `notifications`); no user-deletion cascade exists for the new tables.
+
+When extending Phase 6, keep the existing conventions: raw SQL in `src/lib/queries/`, owner-gating on every mutation, public-read for viewing, bilingual Chinese-first UI, and migrate-before-push for any schema change.
 
 ## Tech Stack
 
