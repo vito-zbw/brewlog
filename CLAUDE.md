@@ -45,7 +45,7 @@ No authentication, no image uploads, no public access. `created_by` / `visited_b
 - "Coffee crawl" feature: multi-café trip reports
 - Community leaderboards (optional): most origins explored, most cafés visited
 
-### Phase 5 — Account Management and CRUD ✅ (shipped)
+### Phase 5 — Account Management and CRUD
 
 - **Bean CRUD**: create, edit, and delete beans (owner-gated); inline bean creation also lives in the log-a-visit form
 - **Email/password login**: a third sign-in method alongside Google/GitHub, with open self-registration at `/register`. No email verification or password-reset emails — that keeps the stack free (email needs a paid domain); a CLI `npm run reset-password` covers lost passwords. Adds `users.password_hash` (scrypt, per-user salt) via `npm run migrate:phase5`. See `docs/setup/password-auth.md`
@@ -55,14 +55,12 @@ No authentication, no image uploads, no public access. `created_by` / `visited_b
 ### Phase 6 — Engagement and Reach
 
 - **Notifications** ✅ (shipped): in-app, **directed events only** — new follower, follow-back, comment-on-your-content, reaction-on-your-content. Nav bell with an unread badge.
-- **Comments & reactions** ✅ (shipped): **flat** comments + a single 👍 like on **visits, beans, crawls** (shared target set). Polymorphic `(resource_type, resource_id)` like `photos` (fixed-map guard in `src/lib/queries/social-entities.ts`); public GET, login-gated writes; author-only comment delete; reactions are a composite-PK junction. Deleting a visit/bean/crawl manually cascades its comments/reactions/notifications. Mounted via `EngagementSection` on the three detail pages.
-- **Richer discovery** ✅ (shipped): discrete origin/roaster `<select>` filters on `/beans` (alongside the free-text search, AND-combined), a "相似咖啡豆 Similar Beans" section on bean detail (weighted attribute overlap, no new table), and café-map marker clustering (`react-leaflet-cluster` + divIcon markers; `disableClusteringAtZoom=13` so the city view clusters and one zoom-in reveals individuals).
-- **Data export** ✅ (shipped): a user downloads **their own** visits + beans as JSON (full bundle) or CSV (flat visits table) from `/settings`. `GET /api/users/[id]/export` is login-gated and self-scoped (403 otherwise). CSV defuses spreadsheet formula injection and is RFC-4180 quoted (UTF-8 BOM for Excel CJK).
+- **Comments & reactions** ✅ (shipped): **flat** comments + a single 👍 like on **visits, beans, crawls**.
+- **Richer discovery** ✅ (shipped): discrete origin/roaster `<select>` filters on `/beans` (alongside the free-text search, AND-combined), a "相似咖啡豆 Similar Beans" section on bean detail (weighted attribute overlap), and café-map marker clustering so the city view clusters and one zoom-in reveals individuals.
+- **Data export** ✅ (shipped): a user downloads **their own** visits + beans as JSON (full bundle) or CSV (flat visits table) from `/settings`.
 - **Feed & timeline pagination** ✅ (shipped): keyset (cursor) pagination for `/feed` and the `/visits` timeline. Both order by the date the visit happened, with a stable `id` tiebreaker, render a `加载更多` button.
-- **Account hardening** (deferred): rate-limiting on login/registration/follow (Vercel WAF or an Upstash free tier) and email-verification gating for OAuth identities — including the new comment/reaction write surfaces, which currently have no rate limiting.
+- **Account hardening** (deferred): email-verification gating for OAuth identities.
 - **PWA / offline logging** (deferred): log a visit offline on mobile and sync later.
-
-**Known low-severity trade-offs (accepted at current 3-user scale, from the Phase 6 adversarial review):** deleting a single *comment* leaves its notification (links still resolve to the valid resource page; a precise fix needs a `comment_id` column on `notifications`); no user-deletion cascade exists for the new tables.
 
 When extending Phase 6, keep the existing conventions: raw SQL in `src/lib/queries/`, owner-gating on every mutation, public-read for viewing, bilingual Chinese-first UI, and migrate-before-push for any schema change.
 
