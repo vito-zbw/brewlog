@@ -47,8 +47,6 @@ No authentication, no image uploads, no public access. `created_by` / `visited_b
 
 ### Phase 5 — Account Management and CRUD ✅ (shipped)
 
-Built incrementally on top of Phase 4 in response to real usage:
-
 - **Bean CRUD**: create, edit, and delete beans (owner-gated); inline bean creation also lives in the log-a-visit form
 - **Email/password login**: a third sign-in method alongside Google/GitHub, with open self-registration at `/register`. No email verification or password-reset emails — that keeps the stack free (email needs a paid domain); a CLI `npm run reset-password` covers lost passwords. Adds `users.password_hash` (scrypt, per-user salt) via `npm run migrate:phase5`. See `docs/setup/password-auth.md`
 - **Account settings** (`/settings`): change your display name; names are unique case-insensitively (`migrate:username`)
@@ -56,9 +54,7 @@ Built incrementally on top of Phase 4 in response to real usage:
 
 ### Phase 6 — Engagement and Reach
 
-Built incrementally on top of Phase 4/5. Four features shipped; account hardening and offline logging remain deferred. All stay within free-tier services. Schema change applied via `npm run migrate:phase6` (adds `comments`, `reactions`, `notifications`).
-
-- **Notifications** ✅ (shipped): in-app, **directed events only** — new follower, follow-back, comment-on-your-content, reaction-on-your-content. Activity from people you follow stays in `/feed` (no per-visit fan-out). Nav bell with an unread badge (server-seeded + 30s poll) → `/notifications` page (keyset-paginated, marks read on view, per-item ✕ dismiss + 全部清除 clear-all). In-app only, no email. Tables: `notifications` (recipient `user_id`, `actor_id`, `event_type`, polymorphic `resource_type`/`resource_id`, `read_at`). Fan-out from the follow/comment/reaction write sites; reactions/follows dedupe.
+- **Notifications** ✅ (shipped): in-app, **directed events only** — new follower, follow-back, comment-on-your-content, reaction-on-your-content. Nav bell with an unread badge.
 - **Comments & reactions** ✅ (shipped): **flat** comments + a single 👍 like on **visits, beans, crawls** (shared target set). Polymorphic `(resource_type, resource_id)` like `photos` (fixed-map guard in `src/lib/queries/social-entities.ts`); public GET, login-gated writes; author-only comment delete; reactions are a composite-PK junction. Deleting a visit/bean/crawl manually cascades its comments/reactions/notifications. Mounted via `EngagementSection` on the three detail pages.
 - **Richer discovery** ✅ (shipped): discrete origin/roaster `<select>` filters on `/beans` (alongside the free-text search, AND-combined), a "相似咖啡豆 Similar Beans" section on bean detail (weighted attribute overlap, no new table), and café-map marker clustering (`react-leaflet-cluster` + divIcon markers; `disableClusteringAtZoom=13` so the city view clusters and one zoom-in reveals individuals).
 - **Data export** ✅ (shipped): a user downloads **their own** visits + beans as JSON (full bundle) or CSV (flat visits table) from `/settings`. `GET /api/users/[id]/export` is login-gated and self-scoped (403 otherwise). CSV defuses spreadsheet formula injection and is RFC-4180 quoted (UTF-8 BOM for Excel CJK).
